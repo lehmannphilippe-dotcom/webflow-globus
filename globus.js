@@ -18,7 +18,7 @@
   // CONFIG
   // =========================================================
   Cesium.Ion.defaultAccessToken =
-    window.CESIUM_ION_TOKEN || "PASTE_YOUR_CESIUM_ION_TOKEN_HERE";
+    window.CESIUM_ION_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ODA4ZDBiOS05M2JlLTQ4NjctYmQ0OS0zM2JjYW";
 
   const CONFIG = {
     DATA_URL:
