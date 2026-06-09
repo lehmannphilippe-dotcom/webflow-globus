@@ -155,7 +155,7 @@
     familyDesc: document.getElementById("family-description"),
     familyCount: document.getElementById("family-count"),
 	familyStickyGenusLink: document.getElementById("family-sticky-genus-link"),
-	familyStickyGenusText: document.querySelector("#family-sticky-genus-link .link-genus"),  
+	familyStickyGenusText: document.querySelector("#family-sticky-genus-link .link.genus"), 
     familyReferencesToggle: document.getElementById("family-references-toggle"),
     familyReferencesContent: document.getElementById("family-references-content"),
     familyReferencesList: document.getElementById("family-references-list"),
@@ -571,8 +571,14 @@ function equalizeCardRailLayout(container) {
     return el;
   }
 
-  function createFamilyGenusSpacer(text) {
-	  function getFamilyGenusGroups() {
+ function createFamilyGenusSpacer(text) {
+  const el = createFamilyGenusLabel(text);
+  el.style.visibility = "hidden";
+  el.style.pointerEvents = "none";
+  return el;
+}
+
+function getFamilyGenusGroups() {
   const container = DOM.familyCards;
   if (!container) return [];
 
@@ -625,7 +631,8 @@ function updateStickyFamilyGenusLink() {
 
   const containerRect = container.getBoundingClientRect();
 
-  // Aktiv ist die erste Gattung, deren letzte Card noch sichtbar ist
+  // Aktiv bleibt die erste Gattung,
+  // deren letzte Card noch im Viewport sichtbar ist
   let activeGroup = groups[groups.length - 1];
 
   for (const group of groups) {
@@ -661,11 +668,6 @@ function bindStickyFamilyGenusScroll() {
     { passive: true }
   );
 }
-    const el = createFamilyGenusLabel(text);
-    el.style.visibility = "hidden";
-    el.style.pointerEvents = "none";
-    return el;
-  }
 
   function getPanelScrollContent(panelEl) {
     return panelEl?.querySelector(".panel-content") || panelEl || null;
