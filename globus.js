@@ -18,7 +18,7 @@
   // CONFIG
   // =========================================================
   Cesium.Ion.defaultAccessToken =
-    window.CESIUM_ION_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ODA4ZDBiOS05M2JlLTQ4NjctYmQ0OS0zM2JjYW";
+    window.CESIUM_ION_TOKEN || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ODA4ZDBiOS05M2JlLTQ4NjctYmQ0OS0zM2JjYWVjMzk4NWMiLCJpZCI6MzgyNTE0LCJpYXQiOjE3NjkxNTYzNzR9.ZkLvFesgBl7prhnS8FyQOIQzl0KS8gS_GXjufzsvpRk"";
 
   const CONFIG = {
     DATA_URL:
@@ -154,6 +154,8 @@
     familyExtDate: document.getElementById("family-extinction-date"),
     familyDesc: document.getElementById("family-description"),
     familyCount: document.getElementById("family-count"),
+	familyStickyGenusLink: document.getElementById("family-sticky-genus-link"),
+	familyStickyGenusText: document.querySelector("#family-sticky-genus-link .link-genus"),  
     familyReferencesToggle: document.getElementById("family-references-toggle"),
     familyReferencesContent: document.getElementById("family-references-content"),
     familyReferencesList: document.getElementById("family-references-list"),
@@ -570,6 +572,95 @@ function equalizeCardRailLayout(container) {
   }
 
   function createFamilyGenusSpacer(text) {
+	  function getFamilyGenusGroups() {
+  const container = DOM.familyCards;
+  if (!container) return [];
+
+  const columns = Array.from(
+    container.querySelectorAll(".family-card-column")
+  ).filter((el) => el.offsetParent !== null);
+
+  if (!columns.length) return [];
+
+  const groups = [];
+  let current = null;
+
+  for (const col of columns) {
+    const label = col.dataset.genusLabel || "";
+    const key = col.dataset.genusKey || "";
+    const cardEl = col.querySelector(".species-card") || col;
+
+    if (!current || current.key !== key) {
+      current = {
+        key,
+        label,
+        firstCol: col,
+        lastCol: col,
+        lastCard: cardEl
+      };
+      groups.push(current);
+    } else {
+      current.lastCol = col;
+      current.lastCard = cardEl;
+    }
+  }
+
+  return groups;
+}
+
+function updateStickyFamilyGenusLink() {
+  const container = DOM.familyCards;
+  const stickyLink = DOM.familyStickyGenusLink;
+  const stickyText = DOM.familyStickyGenusText;
+
+  if (!container || !stickyLink) return;
+
+  const groups = getFamilyGenusGroups();
+
+  if (!groups.length) {
+    if (stickyText) stickyText.textContent = "";
+    stickyLink.dataset.genusKey = "";
+    return;
+  }
+
+  const containerRect = container.getBoundingClientRect();
+
+  // Aktiv ist die erste Gattung, deren letzte Card noch sichtbar ist
+  let activeGroup = groups[groups.length - 1];
+
+  for (const group of groups) {
+    const lastRect = group.lastCard.getBoundingClientRect();
+
+    if (lastRect.right > containerRect.left) {
+      activeGroup = group;
+      break;
+    }
+  }
+
+  if (stickyText) {
+    stickyText.textContent = activeGroup.label || "";
+  } else {
+    stickyLink.textContent = activeGroup.label || "";
+  }
+
+  stickyLink.dataset.genusKey = activeGroup.key || "";
+}
+
+function bindStickyFamilyGenusScroll() {
+  const container = DOM.familyCards;
+  if (!container) return;
+  if (container.dataset.stickyGenusBound === "true") return;
+
+  container.dataset.stickyGenusBound = "true";
+
+  container.addEventListener(
+    "scroll",
+    () => {
+      updateStickyFamilyGenusLink();
+    },
+    { passive: true }
+  );
+}
     const el = createFamilyGenusLabel(text);
     el.style.visibility = "hidden";
     el.style.pointerEvents = "none";
@@ -617,6 +708,7 @@ function equalizeCardRailLayout(container) {
 
   enableHorizontalMouseDragScroll(DOM.genusCards);
   enableHorizontalMouseDragScroll(DOM.familyCards);
+  bindStickyFamilyGenusScroll();
 
   // =========================================================
   // CESIUM VIEWER
@@ -687,6 +779,7 @@ function equalizeCardRailLayout(container) {
       requestViewerResize();
       updateCardRailTitleLayout(DOM.genusCards);
       updateCardRailTitleLayout(DOM.familyCards);
+		updateStickyFamilyGenusLink();
       if (document.body.classList.contains("panel-open")) {
         requestPanelShiftUpdate();
       }
@@ -1423,6 +1516,9 @@ function equalizeCardRailLayout(container) {
       });
 
       const genusLabel = getGenusHeadingLabel(item);
+		const genusKey = item?.taxonomy?.genus_key || "";
+		col.dataset.genusLabel = genusLabel;
+		col.dataset.genusKey = genusKey;
       col.appendChild(
         genusLabel !== lastGenus
           ? createFamilyGenusLabel(genusLabel)
@@ -1433,9 +1529,13 @@ function equalizeCardRailLayout(container) {
       const card = buildSpeciesCard(item);
       if (card) col.appendChild(card);
 
-      container.appendChild(col);
+          container.appendChild(col);
     }
-  }
+
+    doubleRAF(() => {
+      updateStickyFamilyGenusLink();
+    });
+}
 
   function closeSecondaryPanels() {
     DOM.familyPanel?.classList.remove("is-open");
@@ -1472,18 +1572,23 @@ function equalizeCardRailLayout(container) {
     await smartAdjustViewToRange(currentPrimaryPolygonDS);
   }
 
-  function openGenusPanelFromSpecies(speciesItem) {
-    const genusKey = speciesItem?.taxonomy?.genus_key || "";
-    if (!genusKey) return;
+function openGenusPanelByKey(genusKey) {
+  if (!genusKey) return;
 
-    const genusItem = GENUS_BY_KEY.get(genusKey);
-    if (!genusItem) return;
+  const genusItem = GENUS_BY_KEY.get(genusKey);
+  if (!genusItem) return;
 
-    const speciesInGenus = ALL.filter((x) => x?.taxonomy?.genus_key === genusKey);
-    fillGenusPanel(genusItem, speciesInGenus);
-    renderGenusCards(speciesInGenus);
-    finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
-  }
+  const speciesInGenus = ALL.filter(
+    (x) => x?.taxonomy?.genus_key === genusKey
+  );
+
+  fillGenusPanel(genusItem, speciesInGenus);
+  renderGenusCards(speciesInGenus);
+  finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
+}
+	function openGenusPanelFromSpecies(speciesItem) {
+  openGenusPanelByKey(speciesItem?.taxonomy?.genus_key || "");
+}
 
   function openFamilyPanelFromSpecies(speciesItem) {
     const familyKey = speciesItem?.taxonomy?.family_key || "";
@@ -1498,6 +1603,9 @@ function equalizeCardRailLayout(container) {
     fillFamilyPanel(familyItem, speciesInFamily);
     renderFamilyCards(speciesInFamily);
     finalizeSecondaryPanel(DOM.familyPanel, DOM.familyCards);
+	  doubleRAF(() => {
+  updateStickyFamilyGenusLink();
+});
   }
 
   async function closeAllPanels() {
@@ -1525,7 +1633,16 @@ function equalizeCardRailLayout(container) {
     e.stopPropagation();
     if (activeSpeciesItem) openFamilyPanelFromSpecies(activeSpeciesItem);
   });
+DOM.familyStickyGenusLink?.addEventListener("click", (e) => {
+  e.preventDefault();
+  e.stopPropagation();
 
+  const genusKey = DOM.familyStickyGenusLink?.dataset.genusKey || "";
+  if (!genusKey) return;
+
+  openGenusPanelByKey(genusKey);
+});
+	
   [DOM.panelEl, DOM.familyPanel, DOM.genusPanel].forEach((panel) => {
     panel?.addEventListener("click", (e) => e.stopPropagation());
   });
