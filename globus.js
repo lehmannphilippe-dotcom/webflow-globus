@@ -557,12 +557,25 @@
     });
   }
 
-  function createFamilyGenusLabel(text) {
-    const el = document.createElement("div");
-    el.className = "family-genus-label";
-    el.textContent = text || "";
-    return el;
-  }
+  function createFamilyGenusLabel(text, genusKey = "") {
+  const el = document.createElement("a");
+  el.className = "family-genus-label";
+  el.href = "#";
+  el.textContent = text || "";
+  el.dataset.genusKey = genusKey;
+
+  el.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const key = el.dataset.genusKey || "";
+    if (!key) return;
+
+    openGenusPanelByKey(key);
+  });
+
+  return el;
+}
 
   function createFamilyGenusSpacer(text) {
     const el = createFamilyGenusLabel(text);
@@ -1515,11 +1528,11 @@
       col.dataset.genusKey = genusKey;
 
       col.appendChild(
-        genusLabel !== lastGenus
-          ? createFamilyGenusLabel(genusLabel)
-          : createFamilyGenusSpacer(genusLabel)
-      );
-      lastGenus = genusLabel;
+     genusLabel !== lastGenus
+    ? createFamilyGenusLabel(genusLabel, genusKey)
+    : createFamilyGenusSpacer(genusLabel)
+);
+lastGenus = genusLabel;
 
       const card = buildSpeciesCard(item);
       if (card) col.appendChild(card);
