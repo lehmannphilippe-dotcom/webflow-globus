@@ -154,8 +154,8 @@
     familyExtDate: document.getElementById("family-extinction-date"),
     familyDesc: document.getElementById("family-description"),
     familyCount: document.getElementById("family-count"),
-	familyStickyGenusLink: document.getElementById("family-sticky-genus-link"),
-	familyStickyGenusText: document.querySelector("#family-sticky-genus-link .link.genus"), 
+    familyStickyGenusLink: document.getElementById("family-sticky-genus-link"),
+    familyStickyGenusText: document.querySelector("#family-sticky-genus-link .link-genus"),
     familyReferencesToggle: document.getElementById("family-references-toggle"),
     familyReferencesContent: document.getElementById("family-references-content"),
     familyReferencesList: document.getElementById("family-references-list"),
@@ -232,24 +232,22 @@
     const lat = (item?.name?.lat || "").toString().trim().toLowerCase();
     return /\bsp\.\s*$/.test(lat);
   }
+
   function getExtinctSpeciesFormsLabel(speciesList = []) {
-  const total = speciesList.length;
-  const spCount = speciesList.filter(isSpForm).length;
+    const total = speciesList.length;
+    const spCount = speciesList.filter(isSpForm).length;
 
-  // keine sp.-Formen
-  if (spCount === 0) {
-    return `${total} ${pluralize(total, "ausgestorbene Art", "ausgestorbene Arten")}`;
+    if (spCount === 0) {
+      return `${total} ${pluralize(total, "ausgestorbene Art", "ausgestorbene Arten")}`;
+    }
+
+    if (spCount === total) {
+      return `${total} ${pluralize(total, "ausgestorbene Form", "ausgestorbene Formen")}`;
+    }
+
+    return `${total} ausgestorbene Arten/Formen`;
   }
 
-  // nur sp.-Formen
-  if (spCount === total) {
-    return `${total} ${pluralize(total, "ausgestorbene Form", "ausgestorbene Formen")}`;
-  }
-
-  // gemischt
-  return `${total} ausgestorbene Arten/Formen`;
-}
-  
   function compareSpeciesAlpha(a, b) {
     const aIsSp = isSpForm(a);
     const bIsSp = isSpForm(b);
@@ -489,73 +487,68 @@
   }
 
   function updateCardRailTitleLayout(container) {
-  if (!container) return;
+    if (!container) return;
 
-  doubleRAF(() => {
-    container.classList.toggle(
-      "has-two-line-titles",
-      railHasWrappedTitles(container)
+    doubleRAF(() => {
+      container.classList.toggle(
+        "has-two-line-titles",
+        railHasWrappedTitles(container)
+      );
+
+      equalizeCardRailLayout(container);
+    });
+  }
+
+  function equalizeCardRailLayout(container) {
+    if (!container) return;
+
+    const cards = Array.from(container.querySelectorAll(".species-card")).filter(
+      (el) => el.offsetParent !== null
     );
 
-    equalizeCardRailLayout(container);
-  });
-}
+    if (!cards.length) return;
 
-function equalizeCardRailLayout(container) {
-  if (!container) return;
+    cards.forEach((card) => {
+      card.style.height = "";
 
-  const cards = Array.from(container.querySelectorAll(".species-card")).filter(
-    (el) => el.offsetParent !== null
-  );
+      const nameEl = card.querySelector(".card-name-de");
+      if (nameEl) {
+        nameEl.style.minHeight = "";
+      }
+    });
 
-  if (!cards.length) return;
+    let maxNameHeight = 0;
 
-  // Reset vorherige Höhen
-  cards.forEach((card) => {
-    card.style.height = "";
+    cards.forEach((card) => {
+      const nameEl = card.querySelector(".card-name-de");
+      if (!nameEl) return;
 
-    const nameEl = card.querySelector(".card-name-de");
-    if (nameEl) {
-      nameEl.style.minHeight = "";
-    }
-  });
+      maxNameHeight = Math.max(
+        maxNameHeight,
+        Math.ceil(nameEl.getBoundingClientRect().height)
+      );
+    });
 
-  // Höchste Name-de-Höhe messen
-  let maxNameHeight = 0;
+    cards.forEach((card) => {
+      const nameEl = card.querySelector(".card-name-de");
+      if (!nameEl) return;
 
-  cards.forEach((card) => {
-    const nameEl = card.querySelector(".card-name-de");
-    if (!nameEl) return;
+      nameEl.style.minHeight = `${maxNameHeight}px`;
+    });
 
-    maxNameHeight = Math.max(
-      maxNameHeight,
-      Math.ceil(nameEl.getBoundingClientRect().height)
-    );
-  });
+    let maxCardHeight = 0;
 
-  // Diese Höhe allen Namen geben
-  cards.forEach((card) => {
-    const nameEl = card.querySelector(".card-name-de");
-    if (!nameEl) return;
+    cards.forEach((card) => {
+      maxCardHeight = Math.max(
+        maxCardHeight,
+        Math.ceil(card.getBoundingClientRect().height)
+      );
+    });
 
-    nameEl.style.minHeight = `${maxNameHeight}px`;
-  });
-
-  // Danach höchste gesamte Card-Höhe messen
-  let maxCardHeight = 0;
-
-  cards.forEach((card) => {
-    maxCardHeight = Math.max(
-      maxCardHeight,
-      Math.ceil(card.getBoundingClientRect().height)
-    );
-  });
-
-  // Diese Höhe allen Cards geben
-  cards.forEach((card) => {
-    card.style.height = `${maxCardHeight}px`;
-  });
-}
+    cards.forEach((card) => {
+      card.style.height = `${maxCardHeight}px`;
+    });
+  }
 
   function clearGeneratedCards(container) {
     if (!container) return;
@@ -571,103 +564,102 @@ function equalizeCardRailLayout(container) {
     return el;
   }
 
- function createFamilyGenusSpacer(text) {
-  const el = createFamilyGenusLabel(text);
-  el.style.visibility = "hidden";
-  el.style.pointerEvents = "none";
-  return el;
-}
+  function createFamilyGenusSpacer(text) {
+    const el = createFamilyGenusLabel(text);
+    el.style.visibility = "hidden";
+    el.style.pointerEvents = "none";
+    return el;
+  }
 
-function getFamilyGenusGroups() {
-  const container = DOM.familyCards;
-  if (!container) return [];
+  function getFamilyGenusGroups() {
+    const container = DOM.familyCards;
+    if (!container) return [];
 
-  const columns = Array.from(
-    container.querySelectorAll(".family-card-column")
-  ).filter((el) => el.offsetParent !== null);
+    const columns = Array.from(
+      container.querySelectorAll(".family-card-column")
+    ).filter((el) => el.offsetParent !== null);
 
-  if (!columns.length) return [];
+    if (!columns.length) return [];
 
-  const groups = [];
-  let current = null;
+    const groups = [];
+    let current = null;
 
-  for (const col of columns) {
-    const label = col.dataset.genusLabel || "";
-    const key = col.dataset.genusKey || "";
-    const cardEl = col.querySelector(".species-card") || col;
+    for (const col of columns) {
+      const label = col.dataset.genusLabel || "";
+      const key = col.dataset.genusKey || "";
+      const cardEl = col.querySelector(".species-card") || col;
 
-    if (!current || current.key !== key) {
-      current = {
-        key,
-        label,
-        firstCol: col,
-        lastCol: col,
-        lastCard: cardEl
-      };
-      groups.push(current);
+      if (!current || current.key !== key) {
+        current = {
+          key,
+          label,
+          firstCol: col,
+          lastCol: col,
+          lastCard: cardEl
+        };
+        groups.push(current);
+      } else {
+        current.lastCol = col;
+        current.lastCard = cardEl;
+      }
+    }
+
+    return groups;
+  }
+
+  function updateStickyFamilyGenusLink() {
+    const container = DOM.familyCards;
+    const stickyLink = DOM.familyStickyGenusLink;
+    const stickyText = DOM.familyStickyGenusText;
+
+    if (!container || !stickyLink) return;
+
+    const groups = getFamilyGenusGroups();
+
+    if (!groups.length) {
+      if (stickyText) stickyText.textContent = "";
+      stickyLink.dataset.genusKey = "";
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const stickyThreshold = containerRect.left + 24;
+
+    let activeGroup = groups[groups.length - 1];
+
+    for (const group of groups) {
+      const lastRect = group.lastCard.getBoundingClientRect();
+
+      if (lastRect.right > stickyThreshold) {
+        activeGroup = group;
+        break;
+      }
+    }
+
+    if (stickyText) {
+      stickyText.textContent = activeGroup.label || "";
     } else {
-      current.lastCol = col;
-      current.lastCard = cardEl;
+      stickyLink.textContent = activeGroup.label || "";
     }
+
+    stickyLink.dataset.genusKey = activeGroup.key || "";
   }
 
-  return groups;
-}
+  function bindStickyFamilyGenusScroll() {
+    const container = DOM.familyCards;
+    if (!container) return;
+    if (container.dataset.stickyGenusBound === "true") return;
 
-function updateStickyFamilyGenusLink() {
-  const container = DOM.familyCards;
-  const stickyLink = DOM.familyStickyGenusLink;
-  const stickyText = DOM.familyStickyGenusText;
+    container.dataset.stickyGenusBound = "true";
 
-  if (!container || !stickyLink) return;
-
-  const groups = getFamilyGenusGroups();
-
-  if (!groups.length) {
-    if (stickyText) stickyText.textContent = "";
-    stickyLink.dataset.genusKey = "";
-    return;
+    container.addEventListener(
+      "scroll",
+      () => {
+        updateStickyFamilyGenusLink();
+      },
+      { passive: true }
+    );
   }
-
-  const containerRect = container.getBoundingClientRect();
-
-  // Aktiv bleibt die erste Gattung,
-  // deren letzte Card noch im Viewport sichtbar ist
-  let activeGroup = groups[groups.length - 1];
-
-  for (const group of groups) {
-    const lastRect = group.lastCard.getBoundingClientRect();
-
-    if (lastRect.right > containerRect.left) {
-      activeGroup = group;
-      break;
-    }
-  }
-
-  if (stickyText) {
-    stickyText.textContent = activeGroup.label || "";
-  } else {
-    stickyLink.textContent = activeGroup.label || "";
-  }
-
-  stickyLink.dataset.genusKey = activeGroup.key || "";
-}
-
-function bindStickyFamilyGenusScroll() {
-  const container = DOM.familyCards;
-  if (!container) return;
-  if (container.dataset.stickyGenusBound === "true") return;
-
-  container.dataset.stickyGenusBound = "true";
-
-  container.addEventListener(
-    "scroll",
-    () => {
-      updateStickyFamilyGenusLink();
-    },
-    { passive: true }
-  );
-}
 
   function getPanelScrollContent(panelEl) {
     return panelEl?.querySelector(".panel-content") || panelEl || null;
@@ -781,7 +773,7 @@ function bindStickyFamilyGenusScroll() {
       requestViewerResize();
       updateCardRailTitleLayout(DOM.genusCards);
       updateCardRailTitleLayout(DOM.familyCards);
-		updateStickyFamilyGenusLink();
+      updateStickyFamilyGenusLink();
       if (document.body.classList.contains("panel-open")) {
         requestPanelShiftUpdate();
       }
@@ -1396,14 +1388,14 @@ function bindStickyFamilyGenusScroll() {
     U.setText(DOM.familyExtDate, familyDate);
     U.setHTML(DOM.familyDesc, familyItem?.panel?.description || "");
 
-  	 const extinctLabel = getExtinctSpeciesFormsLabel(speciesList);
-	const genusLabel = pluralize(genusCount, "Gattung", "Gattungen");
+    const extinctLabel = getExtinctSpeciesFormsLabel(speciesList);
+    const genusLabel = pluralize(genusCount, "Gattung", "Gattungen");
 
-	U.setText(
-  	DOM.familyCount,
- 	 `${extinctLabel} in ${genusCount} ${genusLabel}`
-	);
-    
+    U.setText(
+      DOM.familyCount,
+      `${extinctLabel} in ${genusCount} ${genusLabel}`
+    );
+
     renderReferencesList(DOM.familyReferencesList, familyItem);
     setReferencesAccordionState(
       DOM.familyReferencesContent,
@@ -1518,9 +1510,10 @@ function bindStickyFamilyGenusScroll() {
       });
 
       const genusLabel = getGenusHeadingLabel(item);
-		const genusKey = item?.taxonomy?.genus_key || "";
-		col.dataset.genusLabel = genusLabel;
-		col.dataset.genusKey = genusKey;
+      const genusKey = item?.taxonomy?.genus_key || "";
+      col.dataset.genusLabel = genusLabel;
+      col.dataset.genusKey = genusKey;
+
       col.appendChild(
         genusLabel !== lastGenus
           ? createFamilyGenusLabel(genusLabel)
@@ -1531,13 +1524,13 @@ function bindStickyFamilyGenusScroll() {
       const card = buildSpeciesCard(item);
       if (card) col.appendChild(card);
 
-          container.appendChild(col);
+      container.appendChild(col);
     }
 
     doubleRAF(() => {
       updateStickyFamilyGenusLink();
     });
-}
+  }
 
   function closeSecondaryPanels() {
     DOM.familyPanel?.classList.remove("is-open");
@@ -1574,23 +1567,24 @@ function bindStickyFamilyGenusScroll() {
     await smartAdjustViewToRange(currentPrimaryPolygonDS);
   }
 
-function openGenusPanelByKey(genusKey) {
-  if (!genusKey) return;
+  function openGenusPanelByKey(genusKey) {
+    if (!genusKey) return;
 
-  const genusItem = GENUS_BY_KEY.get(genusKey);
-  if (!genusItem) return;
+    const genusItem = GENUS_BY_KEY.get(genusKey);
+    if (!genusItem) return;
 
-  const speciesInGenus = ALL.filter(
-    (x) => x?.taxonomy?.genus_key === genusKey
-  );
+    const speciesInGenus = ALL.filter(
+      (x) => x?.taxonomy?.genus_key === genusKey
+    );
 
-  fillGenusPanel(genusItem, speciesInGenus);
-  renderGenusCards(speciesInGenus);
-  finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
-}
-	function openGenusPanelFromSpecies(speciesItem) {
-  openGenusPanelByKey(speciesItem?.taxonomy?.genus_key || "");
-}
+    fillGenusPanel(genusItem, speciesInGenus);
+    renderGenusCards(speciesInGenus);
+    finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
+  }
+
+  function openGenusPanelFromSpecies(speciesItem) {
+    openGenusPanelByKey(speciesItem?.taxonomy?.genus_key || "");
+  }
 
   function openFamilyPanelFromSpecies(speciesItem) {
     const familyKey = speciesItem?.taxonomy?.family_key || "";
@@ -1605,9 +1599,10 @@ function openGenusPanelByKey(genusKey) {
     fillFamilyPanel(familyItem, speciesInFamily);
     renderFamilyCards(speciesInFamily);
     finalizeSecondaryPanel(DOM.familyPanel, DOM.familyCards);
-	  doubleRAF(() => {
-  updateStickyFamilyGenusLink();
-});
+
+    doubleRAF(() => {
+      updateStickyFamilyGenusLink();
+    });
   }
 
   async function closeAllPanels() {
@@ -1635,16 +1630,17 @@ function openGenusPanelByKey(genusKey) {
     e.stopPropagation();
     if (activeSpeciesItem) openFamilyPanelFromSpecies(activeSpeciesItem);
   });
-DOM.familyStickyGenusLink?.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
 
-  const genusKey = DOM.familyStickyGenusLink?.dataset.genusKey || "";
-  if (!genusKey) return;
+  DOM.familyStickyGenusLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  openGenusPanelByKey(genusKey);
-});
-	
+    const genusKey = DOM.familyStickyGenusLink?.dataset.genusKey || "";
+    if (!genusKey) return;
+
+    openGenusPanelByKey(genusKey);
+  });
+
   [DOM.panelEl, DOM.familyPanel, DOM.genusPanel].forEach((panel) => {
     panel?.addEventListener("click", (e) => e.stopPropagation());
   });
