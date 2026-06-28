@@ -304,3 +304,38 @@ body.panel-open #globe {
   display: flex;
   flex-direction: column;
 }
+
+/* ---------------------------------
+   FAMILY STICKY GENUS LINK
+--------------------------------- */
+
+#family-sticky-genus-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+
+  margin: 0 24px 4px 24px; /* unten kleiner = weniger Abstand zu den Cards */
+  padding: 0;
+
+  min-height: 20px;
+  background: transparent !important;
+  border: 0;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+#family-sticky-genus-link .link-genus {
+  margin: 0;
+  padding: 0;
+
+  font-family: "Rubik Variable", Rubik, sans-serif;
+  font-size: 17px;
+  font-weight: 300;
+  line-height: 1.2;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+#family-sticky-genus-link:hover .link-genus {
+  text-decoration: underline;
+}
