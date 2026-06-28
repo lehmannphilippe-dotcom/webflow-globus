@@ -558,9 +558,9 @@
   }
 
   function createFamilyGenusLabel(text, genusKey = "") {
-  const el = document.createElement("a");
+  const el = document.createElement("button");
+  el.type = "button";
   el.className = "family-genus-label";
-  el.href = "#";
   el.textContent = text || "";
   el.dataset.genusKey = genusKey;
 
@@ -576,13 +576,15 @@
 
   return el;
 }
-
-  function createFamilyGenusSpacer(text) {
-    const el = createFamilyGenusLabel(text);
-    el.style.visibility = "hidden";
-    el.style.pointerEvents = "none";
-    return el;
-  }
+   
+ function createFamilyGenusSpacer(text) {
+  const el = document.createElement("div");
+  el.className = "family-genus-label";
+  el.textContent = text || "";
+  el.style.visibility = "hidden";
+  el.style.pointerEvents = "none";
+  return el;
+}
 
   function getFamilyGenusGroups() {
     const container = DOM.familyCards;
