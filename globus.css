@@ -306,36 +306,30 @@ body.panel-open #globe {
 }
 
 /* ---------------------------------
-   FAMILY STICKY GENUS LINK
+   FAMILY GENUS LABEL BUTTONS
 --------------------------------- */
 
-#family-sticky-genus-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
+.family-genus-label {
+  appearance: none !important;
+  -webkit-appearance: none !important;
 
-  margin: 0 24px 0px 24px; /* unten kleiner = weniger Abstand zu den Cards */
-  padding: 0;
-
-  min-height: 20px;
+  margin: 0 !important;
+  padding: 0 !important;
   background: transparent !important;
-  border: 0;
-  box-shadow: none;
-  text-decoration: none;
+  border: 0 !important;
+  box-shadow: none !important;
+
+  font-family: "Rubik Variable", Rubik, sans-serif !important;
+  font-size: 17px !important;
+  font-weight: 300 !important;
+  font-style: normal !important;
+  line-height: 1.2 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  cursor: pointer !important;
 }
 
-#family-sticky-genus-link .link-genus {
-  margin: 0;
-  padding: 0;
-
-  font-family: "Rubik Variable", Rubik, sans-serif;
-  font-size: 17px;
-  font-weight: 300;
-  line-height: 1.2;
-  color: #ffffff;
-  text-decoration: none;
-}
-
-#family-sticky-genus-link:hover .link-genus {
-  text-decoration: underline;
+.family-genus-label:hover {
+  text-decoration: underline !important;
 }
