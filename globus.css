@@ -314,7 +314,7 @@ body.panel-open #globe {
   align-items: center;
   justify-content: flex-start;
 
-  margin: 0 24px 4px 24px; /* unten kleiner = weniger Abstand zu den Cards */
+  margin: 0 24px 0px 24px; /* unten kleiner = weniger Abstand zu den Cards */
   padding: 0;
 
   min-height: 20px;
