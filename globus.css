@@ -331,5 +331,6 @@ body.panel-open #globe {
 }
 
 .family-genus-label:hover {
+  color: #ff5100 !important;
   text-decoration: underline !important;
 }
