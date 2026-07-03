@@ -303,6 +303,7 @@ body.panel-open #globe {
 .family-card-column {
   display: flex;
   flex-direction: column;
+  gap: 2px !important;
 }
 
 /* ---------------------------------
