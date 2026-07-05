@@ -558,68 +558,43 @@
   }
 
   function createFamilyGenusLabel(text, genusKey = "") {
-  const el = document.createElement("button");
-  el.type = "button";
-  el.className = "family-genus-label";
-  el.textContent = text || "";
-  el.dataset.genusKey = genusKey;
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "family-genus-label";
+    el.textContent = text || "";
+    el.dataset.genusKey = genusKey;
 
-  el.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const key = el.dataset.genusKey || "";
-    if (!key) return;
+      const key = el.dataset.genusKey || "";
+      if (!key) return;
 
-    openGenusPanelByKey(key);
-  });
+      openGenusPanelByKey(key);
+    });
 
-  return el;
-}
-   
- function createFamilyGenusSpacer(text) {
-  const el = document.createElement("div");
-  el.className = "family-genus-label";
-  el.textContent = text || "";
-  el.style.visibility = "hidden";
-  el.style.pointerEvents = "none";
-  return el;
-}
+    return el;
+  }
 
   function getFamilyGenusGroups() {
     const container = DOM.familyCards;
     if (!container) return [];
 
-    const columns = Array.from(
-      container.querySelectorAll(".family-card-column")
-    ).filter((el) => el.offsetParent !== null);
+    return Array.from(container.querySelectorAll(".family-genus-group"))
+      .filter((el) => el.offsetParent !== null)
+      .map((groupEl) => {
+        const cards = Array.from(groupEl.querySelectorAll(".species-card"));
+        const lastCard = cards[cards.length - 1] || groupEl;
 
-    if (!columns.length) return [];
-
-    const groups = [];
-    let current = null;
-
-    for (const col of columns) {
-      const label = col.dataset.genusLabel || "";
-      const key = col.dataset.genusKey || "";
-      const cardEl = col.querySelector(".species-card") || col;
-
-      if (!current || current.key !== key) {
-        current = {
-          key,
-          label,
-          firstCol: col,
-          lastCol: col,
-          lastCard: cardEl
+        return {
+          key: groupEl.dataset.genusKey || "",
+          label: groupEl.dataset.genusLabel || "",
+          firstCol: groupEl,
+          lastCol: groupEl,
+          lastCard
         };
-        groups.push(current);
-      } else {
-        current.lastCol = col;
-        current.lastCard = cardEl;
-      }
-    }
-
-    return groups;
+      });
   }
 
   function updateStickyFamilyGenusLink() {
@@ -1511,38 +1486,51 @@
       );
     });
 
-    let lastGenus = "";
+    const groups = [];
+    const groupByKey = new Map();
 
     for (const item of sorted) {
-      const col = document.createElement("div");
-      col.className = "family-card-column";
-
-      Object.assign(col.style, {
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        flex: "0 0 auto"
-      });
-
       const genusLabel = getGenusHeadingLabel(item);
-      const genusKey = item?.taxonomy?.genus_key || "";
-      col.dataset.genusLabel = genusLabel;
-      col.dataset.genusKey = genusKey;
+      const genusKey = item?.taxonomy?.genus_key || genusLabel || "";
 
-      col.appendChild(
-     genusLabel !== lastGenus
-    ? createFamilyGenusLabel(genusLabel, genusKey)
-    : createFamilyGenusSpacer(genusLabel)
-);
-lastGenus = genusLabel;
+      let group = groupByKey.get(genusKey);
 
-      const card = buildSpeciesCard(item);
-      if (card) col.appendChild(card);
+      if (!group) {
+        group = {
+          key: genusKey,
+          label: genusLabel,
+          items: []
+        };
+        groupByKey.set(genusKey, group);
+        groups.push(group);
+      }
 
-      container.appendChild(col);
+      group.items.push(item);
+    }
+
+    for (const group of groups) {
+      const groupEl = document.createElement("div");
+      groupEl.className = "family-genus-group";
+      groupEl.dataset.genusLabel = group.label || "";
+      groupEl.dataset.genusKey = group.key || "";
+
+      const labelEl = createFamilyGenusLabel(group.label, group.key);
+      groupEl.appendChild(labelEl);
+
+      const cardsRow = document.createElement("div");
+      cardsRow.className = "family-genus-card-row";
+
+      for (const item of group.items) {
+        const card = buildSpeciesCard(item);
+        if (card) cardsRow.appendChild(card);
+      }
+
+      groupEl.appendChild(cardsRow);
+      container.appendChild(groupEl);
     }
 
     doubleRAF(() => {
+      updateCardRailTitleLayout(container);
       updateStickyFamilyGenusLink();
     });
   }
