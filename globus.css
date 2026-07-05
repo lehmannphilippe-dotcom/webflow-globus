@@ -335,3 +335,52 @@ body.panel-open #globe {
   color: #ff5100 !important;
   text-decoration: underline !important;
 }
+
+/* ---------------------------------
+   STICKY GENUS LABELS IM FAMILY PANEL
+--------------------------------- */
+
+#family-cards {
+  align-items: stretch !important;
+}
+
+.family-genus-group {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  flex: 0 0 auto !important;
+  width: max-content !important;
+  min-width: max-content !important;
+  gap: 2px !important;
+  overflow: visible !important;
+}
+
+.family-genus-card-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: max-content !important;
+  min-width: max-content !important;
+}
+
+.family-genus-group .family-genus-label {
+  position: sticky !important;
+  left: 24px !important;
+  z-index: 5 !important;
+  align-self: flex-start !important;
+
+  color: #ffffff !important;
+  background: transparent !important;
+}
+
+.family-genus-group .family-genus-label:hover {
+  color: #ff5100 !important;
+  text-decoration: underline !important;
+}
+
+/* Alter separater Sticky-Link wird nicht mehr benötigt */
+#family-sticky-genus-link {
+  display: none !important;
+}
