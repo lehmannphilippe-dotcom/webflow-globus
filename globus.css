@@ -384,3 +384,42 @@ body.panel-open #globe {
 #family-sticky-genus-link {
   display: none !important;
 }
+/* ---------------------------------
+   FAMILY PANEL: 24PX START + FRÜHER STICKY-AUSSTIEG
+--------------------------------- */
+
+/* Kein zusätzlicher Abstand zwischen 24px-Startspacer und erster Gattungsgruppe */
+#family-cards {
+  gap: 0 !important;
+}
+
+/* Start- und Endabstand bleiben exakt 24px */
+#family-cards::before,
+#family-cards::after {
+  flex: 0 0 24px !important;
+}
+
+/* Abstand zwischen den Gattungsgruppen separat setzen */
+.family-genus-group {
+  margin-right: 0 !important;
+}
+
+.family-genus-group:not(:last-child) {
+  margin-right: 8px !important;
+}
+
+/* Begrenzter Sticky-Bereich für den Gattungsnamen */
+.family-genus-label-track {
+  position: relative !important;
+  display: block !important;
+  width: var(--genus-label-track-width, 100%) !important;
+  min-width: var(--genus-label-track-width, 100%) !important;
+  overflow: visible !important;
+}
+
+/* Label klebt bei exakt 24px */
+.family-genus-label-track .family-genus-label {
+  position: sticky !important;
+  left: 24px !important;
+  z-index: 5 !important;
+}
