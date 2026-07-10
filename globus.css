@@ -338,6 +338,7 @@ body.panel-open #globe {
 
 /* ---------------------------------
    STICKY GENUS LABELS IM FAMILY PANEL
+   JS-gesteuert: Multi-Gattungen kleben, Single-Gattungen sliden normal
 --------------------------------- */
 
 #family-cards {
@@ -366,13 +367,20 @@ body.panel-open #globe {
 }
 
 .family-genus-group .family-genus-label {
-  position: sticky !important;
-  left: 24px !important;
+  position: relative !important;
+  left: auto !important;
   z-index: 5 !important;
   align-self: flex-start !important;
 
   color: #ffffff !important;
   background: transparent !important;
+
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+.family-genus-group.is-single-genus .family-genus-label {
+  will-change: auto;
 }
 
 .family-genus-group .family-genus-label:hover {
