@@ -577,75 +577,93 @@
     return el;
   }
 
-  function getFamilyGenusGroups() {
+    function getFamilyGenusGroups() {
     const container = DOM.familyCards;
     if (!container) return [];
 
     return Array.from(container.querySelectorAll(".family-genus-group"))
-      .filter((el) => el.offsetParent !== null)
+      .filter((groupEl) => groupEl.offsetParent !== null)
       .map((groupEl) => {
+        const labelEl = groupEl.querySelector(".family-genus-label");
         const cards = Array.from(groupEl.querySelectorAll(".species-card"));
+        const firstCard = cards[0] || groupEl;
         const lastCard = cards[cards.length - 1] || groupEl;
 
         return {
           key: groupEl.dataset.genusKey || "",
           label: groupEl.dataset.genusLabel || "",
-          firstCol: groupEl,
-          lastCol: groupEl,
+          groupEl,
+          labelEl,
+          cards,
+          firstCard,
           lastCard
         };
       });
   }
 
-  function updateStickyFamilyGenusLink() {
+    function updateStickyFamilyGenusLink() {
     const container = DOM.familyCards;
-    const stickyLink = DOM.familyStickyGenusLink;
-    const stickyText = DOM.familyStickyGenusText;
-
-    if (!container || !stickyLink) return;
-
-    const groups = getFamilyGenusGroups();
-
-    if (!groups.length) {
-      if (stickyText) stickyText.textContent = "";
-      stickyLink.dataset.genusKey = "";
-      return;
-    }
+    if (!container) return;
 
     const containerRect = container.getBoundingClientRect();
-    const stickyThreshold = containerRect.left + 24;
-
-    let activeGroup = groups[groups.length - 1];
+    const stickyLeft = containerRect.left + 24;
+    const groups = getFamilyGenusGroups();
 
     for (const group of groups) {
-      const lastRect = group.lastCard.getBoundingClientRect();
+      const { groupEl, labelEl, cards, lastCard } = group;
+      if (!groupEl || !labelEl) continue;
 
-      if (lastRect.right > stickyThreshold) {
-        activeGroup = group;
-        break;
+      const groupRect = groupEl.getBoundingClientRect();
+      const lastCardRect = lastCard.getBoundingClientRect();
+
+      /*
+        Eine einzelne Card:
+        Der Gattungsname bleibt normal über der Card und scrollt mit.
+      */
+      if (cards.length <= 1) {
+        labelEl.style.transform = "translate3d(0, 0, 0)";
+        continue;
       }
-    }
 
-    if (stickyText) {
-      stickyText.textContent = activeGroup.label || "";
-    } else {
-      stickyLink.textContent = activeGroup.label || "";
-    }
+      /*
+        Mehrere Cards:
+        1. Vor dem Sticky-Punkt: Label bewegt sich normal mit der Gruppe.
+        2. Zwischen erster und letzter Card: Label bleibt bei 24px stehen.
+        3. Sobald die letzte Card den Sticky-Punkt erreicht: Label bewegt sich mit der letzten Card raus.
+      */
+      let targetLeft = groupRect.left;
 
-    stickyLink.dataset.genusKey = activeGroup.key || "";
+      if (groupRect.left < stickyLeft) {
+        targetLeft = stickyLeft;
+      }
+
+      if (lastCardRect.left <= stickyLeft) {
+        targetLeft = lastCardRect.left;
+      }
+
+      const deltaX = Math.round(targetLeft - groupRect.left);
+      labelEl.style.transform = `translate3d(${deltaX}px, 0, 0)`;
+    }
   }
 
-  function bindStickyFamilyGenusScroll() {
+   function bindStickyFamilyGenusScroll() {
     const container = DOM.familyCards;
     if (!container) return;
     if (container.dataset.stickyGenusBound === "true") return;
 
     container.dataset.stickyGenusBound = "true";
 
+    let stickyRAF = 0;
+
     container.addEventListener(
       "scroll",
       () => {
-        updateStickyFamilyGenusLink();
+        if (stickyRAF) return;
+
+        stickyRAF = requestAnimationFrame(() => {
+          stickyRAF = 0;
+          updateStickyFamilyGenusLink();
+        });
       },
       { passive: true }
     );
@@ -1539,9 +1557,13 @@ function renderFamilyCards(speciesList = []) {
 
   for (const group of groups) {
     const groupEl = document.createElement("div");
-    groupEl.className = "family-genus-group";
-    groupEl.dataset.genusLabel = group.label || "";
-    groupEl.dataset.genusKey = group.key || "";
+   groupEl.className = "family-genus-group";
+   groupEl.classList.add(
+   group.items.length > 1 ? "is-multi-genus" : "is-single-genus"
+);
+   groupEl.dataset.genusLabel = group.label || "";
+   groupEl.dataset.genusKey = group.key || "";
+   groupEl.dataset.cardCount = String(group.items.length);
 
     const labelTrack = document.createElement("div");
     labelTrack.className = "family-genus-label-track";
