@@ -1449,7 +1449,8 @@
     if (!item) return;
     activeSpeciesItem = item;
 
-    U.setWFImage(DOM.panelImg, item.images.panel);
+     setPanelImageForItem(item);
+
     U.setText(DOM.panelFamilyLink, item.taxonomy.family);
     U.setText(DOM.panelGenusLink, item.taxonomy.genus);
     U.setText(DOM.panelNameDe, item.name.de);
@@ -1556,7 +1557,15 @@
     U.setText(habitatEl, item?.habitat || "");
     if (habitatEl) habitatEl.style.display = item?.habitat ? "" : "none";
 
-    card.addEventListener("click", async (e) => {
+   card.addEventListener("pointerenter", () => {
+      preloadPanelImageForItem(item);
+    });
+
+    card.addEventListener("focusin", () => {
+      preloadPanelImageForItem(item);
+    });
+     
+     card.addEventListener("click", async (e) => {
       e.preventDefault();
       e.stopPropagation();
       await openSpeciesFromCard(item);
