@@ -431,3 +431,27 @@ body.panel-open #globe {
   left: 24px !important;
   z-index: 5 !important;
 }
+
+/* ---------------------------------
+   PANEL IMAGE LOADING / BLUR PLACEHOLDER
+--------------------------------- */
+
+#panel-image {
+  transition:
+    filter 220ms ease,
+    opacity 220ms ease,
+    transform 220ms ease;
+  will-change: filter, opacity, transform;
+}
+
+#panel-image.is-loading {
+  filter: blur(18px);
+  transform: scale(1.04);
+  opacity: 0.75;
+}
+
+#panel-image:not(.is-loading) {
+  filter: blur(0);
+  transform: scale(1);
+  opacity: 1;
+}
