@@ -216,6 +216,89 @@
   const doubleRAF = (fn) =>
     requestAnimationFrame(() => requestAnimationFrame(fn));
 
+     const imagePreloadCache = new Map();
+  let panelImageRequestId = 0;
+
+  function preloadImage(url) {
+    const src = (url || "").toString().trim();
+    if (!src) return Promise.resolve("");
+
+    const cached = imagePreloadCache.get(src);
+    if (cached) return cached.promise;
+
+    const record = {
+      loaded: false,
+      failed: false,
+      promise: null
+    };
+
+    record.promise = new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => {
+        record.loaded = true;
+        resolve(src);
+      };
+
+      img.onerror = (err) => {
+        record.failed = true;
+        reject(err);
+      };
+
+      img.src = src;
+    });
+
+    imagePreloadCache.set(src, record);
+    return record.promise;
+  }
+
+  function isImageLoaded(url) {
+    const src = (url || "").toString().trim();
+    return !!imagePreloadCache.get(src)?.loaded;
+  }
+
+  function preloadPanelImageForItem(item) {
+    const url = item?.images?.panel;
+    if (!url) return Promise.resolve("");
+    return preloadImage(url).catch(() => "");
+  }
+
+  function setPanelImageForItem(item) {
+    if (!DOM.panelImg || !item) return;
+
+    const panelUrl = item?.images?.panel || CONFIG.DEFAULT_PANEL_IMG;
+    const blurUrl =
+      item?.images?.tooltip ||
+      item?.images?.panel ||
+      CONFIG.DEFAULT_PANEL_IMG;
+
+    const requestId = ++panelImageRequestId;
+
+    if (isImageLoaded(panelUrl)) {
+      DOM.panelImg.classList.remove("is-loading");
+      U.setWFImage(DOM.panelImg, panelUrl);
+      return;
+    }
+
+    DOM.panelImg.classList.add("is-loading");
+    U.setWFImage(DOM.panelImg, blurUrl);
+
+    preloadImage(panelUrl)
+      .then(() => {
+        if (requestId !== panelImageRequestId) return;
+        if (activeSpeciesItem !== item) return;
+
+        U.setWFImage(DOM.panelImg, panelUrl);
+        DOM.panelImg.classList.remove("is-loading");
+      })
+      .catch(() => {
+        if (requestId !== panelImageRequestId) return;
+        if (activeSpeciesItem !== item) return;
+
+        DOM.panelImg.classList.remove("is-loading");
+      });
+  }
+
   function compareText(a, b) {
     return (a || "").toString().trim().localeCompare(
       (b || "").toString().trim(),
@@ -1320,6 +1403,8 @@
 
   function showTooltip(item) {
     if (!DOM.tip || !item) return;
+
+   preloadPanelImageForItem(item);
 
     U.setWFImage(DOM.tipImg, item.images.tooltip);
     U.setText(DOM.tipNameDe, item.name.de);
