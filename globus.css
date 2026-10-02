@@ -455,3 +455,213 @@ body.panel-open #globe {
   transform: scale(1);
   opacity: 1;
 }
+
+/* ---------------------------------
+   AI IMAGE INFO BUTTON + MODAL
+--------------------------------- */
+
+.panel-image-wrap {
+  position: relative !important;
+  width: 100% !important;
+  overflow: hidden !important;
+}
+
+.panel-image-wrap #panel-image {
+  display: block !important;
+  width: 100% !important;
+}
+
+#ai-image-info-button {
+  position: absolute !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  z-index: 12 !important;
+
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  color: #63c982 !important;
+  cursor: pointer !important;
+
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+#ai-image-info-button.is-visible {
+  display: flex !important;
+}
+
+#ai-image-info-button svg {
+  width: 24px !important;
+  height: 24px !important;
+  display: block !important;
+  color: inherit !important;
+}
+
+#ai-image-info-button:hover {
+  transform: scale(1.08);
+}
+
+#ai-image-info-button.ai-type-fossil {
+  color: #ff8a62 !important;
+}
+
+#ai-image-info-button.ai-type-illustration {
+  color: #63c982 !important;
+}
+
+#ai-image-info-button.ai-type-photo-video {
+  color: #7aa2ff !important;
+}
+
+/* Modal */
+
+.ai-image-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+
+  display: none;
+  align-items: center;
+  justify-content: center;
+
+  padding: 32px;
+}
+
+.ai-image-modal.is-open {
+  display: flex;
+}
+
+.ai-image-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 20, 0.72);
+}
+
+.ai-image-modal__card {
+  position: relative;
+  z-index: 1;
+
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+
+  padding: 48px;
+  border-radius: 16px;
+
+  background: #15154a;
+  color: #ffffff;
+
+  font-family: "Rubik Variable", Rubik, sans-serif;
+}
+
+.ai-image-modal__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ff5100;
+
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ai-image-modal__card h2 {
+  margin: 0 0 16px 0;
+  font-size: 34px;
+  font-weight: 300;
+  line-height: 1.1;
+}
+
+.ai-image-modal__card p {
+  margin: 0;
+  color: #97b4e4;
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.45;
+}
+
+.ai-image-modal__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.ai-image-modal__legend-item {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 18px;
+}
+
+.ai-image-modal__legend-icon {
+  width: 16px;
+  height: 16px;
+  margin-top: 3px;
+  transform: rotate(45deg);
+  border-radius: 3px;
+  background: currentColor;
+}
+
+.ai-image-modal__legend-icon.ai-type-fossil {
+  color: #ff8a62;
+}
+
+.ai-image-modal__legend-icon.ai-type-illustration {
+  color: #63c982;
+}
+
+.ai-image-modal__legend-icon.ai-type-photo-video {
+  color: #7aa2ff;
+}
+
+.ai-image-modal__legend-item h3 {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.ai-image-modal__legend-item p {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+body.ai-modal-open {
+  overflow: hidden;
+}
+
+@media (max-width: 860px) {
+  .ai-image-modal {
+    padding: 0;
+  }
+
+  .ai-image-modal__card {
+    width: 100vw;
+    height: 100vh;
+    max-height: none;
+
+    border-radius: 0;
+    padding: 72px 28px 40px 28px;
+  }
+
+  #ai-image-info-button {
+    right: 16px !important;
+    bottom: 16px !important;
+  }
+}
