@@ -126,6 +126,9 @@
       document.querySelector(".panel-close"),
 
     panelImg: document.getElementById("panel-image"),
+    aiImageInfoButton: document.getElementById("ai-image-info-button"),
+    aiImageModal: document.getElementById("ai-image-modal"),
+    aiImageModalClose: document.getElementById("ai-image-modal-close"),
     panelFamilyLink: document.getElementById("panel-family-link"),
     panelGenusLink: document.getElementById("panel-genus-link"),
     panelNameLat: document.getElementById("panel-name-lat"),
@@ -314,6 +317,214 @@
   function isSpForm(item) {
     const lat = (item?.name?.lat || "").toString().trim().toLowerCase();
     return /\bsp\.\s*$/.test(lat);
+  }
+
+  function getAIReferenceType(item) {
+    const type = (
+      item?.ai_reference_type ??
+      item?.ai?.reference_type ??
+      item?.image_ai_reference_type ??
+      ""
+    )
+      .toString()
+      .trim();
+
+    if (!type || type === "null") return "";
+
+    if (!["fossil", "illustration", "photo_video"].includes(type)) {
+      return "";
+    }
+
+    return type;
+  }
+
+  function getAIReferenceClass(type) {
+    if (type === "fossil") return "ai-type-fossil";
+    if (type === "illustration") return "ai-type-illustration";
+    if (type === "photo_video") return "ai-type-photo-video";
+    return "";
+  }
+
+  function isDefaultPanelImage(item) {
+    const panelImage = (item?.images?.panel || "").toString().trim();
+    if (!panelImage) return true;
+
+    const defaultImage = (CONFIG.DEFAULT_PANEL_IMG || "").toString().trim();
+    if (panelImage === defaultImage) return true;
+
+    const filename = panelImage.split("/").pop().toLowerCase();
+    return filename.includes("default");
+  }
+
+  function shouldShowAIIcon(item) {
+    if (!item) return false;
+    if (isSpForm(item)) return false;
+    if (isDefaultPanelImage(item)) return false;
+
+    return !!getAIReferenceType(item);
+  }
+
+  function ensureAIImageInfoUI() {
+    let btn =
+      DOM.aiImageInfoButton ||
+      document.getElementById("ai-image-info-button");
+
+    if (!btn && DOM.panelImg?.parentElement) {
+      btn = document.createElement("button");
+      btn.id = "ai-image-info-button";
+      btn.type = "button";
+      DOM.panelImg.parentElement.appendChild(btn);
+    }
+
+    DOM.aiImageInfoButton = btn || null;
+
+    if (btn && btn.dataset.aiSvgInjected !== "true") {
+      btn.dataset.aiSvgInjected = "true";
+      btn.type = "button";
+      btn.setAttribute("aria-label", "Informationen zu KI-generiertem Bild");
+      btn.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true" focusable="false">
+          <path
+            d="M11 1.5C12.6 6.2 15.8 9.4 20.5 11C15.8 12.6 12.6 15.8 11 20.5C9.4 15.8 6.2 12.6 1.5 11C6.2 9.4 9.4 6.2 11 1.5Z"
+            fill="currentColor"
+          />
+        </svg>
+      `;
+    }
+
+    if (!document.getElementById("ai-image-modal")) {
+      document.body.insertAdjacentHTML(
+        "beforeend",
+        `
+        <div id="ai-image-modal" class="ai-image-modal" aria-hidden="true">
+          <div class="ai-image-modal__backdrop"></div>
+
+          <div class="ai-image-modal__card" role="dialog" aria-modal="true" aria-labelledby="ai-image-modal-title">
+            <button id="ai-image-modal-close" class="ai-image-modal__close" type="button" aria-label="Modal schliessen">×</button>
+
+            <h2 id="ai-image-modal-title">KI-generierte Bilder</h2>
+
+            <p>
+              Die Bilder der Vogelarten wurden mithilfe von Künstlicher Intelligenz (KI) erstellt.
+              Sie orientieren sich so genau wie möglich an verfügbaren wissenschaftlichen Vorlagen
+              und Referenzmaterialien. Dennoch bleiben die Rekonstruktionen mit Unsicherheiten verbunden.
+            </p>
+
+            <div class="ai-image-modal__legend">
+              <div class="ai-image-modal__legend-item">
+                <span class="ai-image-modal__legend-icon ai-type-fossil"></span>
+                <div>
+                  <h3>Fossiles Referenzmaterial</h3>
+                  <p>Die Rekonstruktion basiert ausschliesslich auf fossilem oder subfossilem Material.</p>
+                </div>
+              </div>
+
+              <div class="ai-image-modal__legend-item">
+                <span class="ai-image-modal__legend-icon ai-type-illustration"></span>
+                <div>
+                  <h3>Wissenschaftliche Illustrationen und Museumspräparate</h3>
+                  <p>Als visuelle Referenzen stehen wissenschaftliche Illustrationen und/oder Museumspräparate zur Verfügung.</p>
+                </div>
+              </div>
+
+              <div class="ai-image-modal__legend-item">
+                <span class="ai-image-modal__legend-icon ai-type-photo-video"></span>
+                <div>
+                  <h3>Foto- und Videomaterial</h3>
+                  <p>Das Aussehen der Art ist auch durch historisches Foto- und/oder Filmmaterial dokumentiert.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        `
+      );
+    }
+
+    DOM.aiImageModal = document.getElementById("ai-image-modal");
+    DOM.aiImageModalClose = document.getElementById("ai-image-modal-close");
+  }
+
+  function updateAIImageInfoButton(item) {
+    ensureAIImageInfoUI();
+
+    const btn = DOM.aiImageInfoButton;
+    if (!btn) return;
+
+    btn.classList.remove(
+      "is-visible",
+      "ai-type-fossil",
+      "ai-type-illustration",
+      "ai-type-photo-video"
+    );
+
+    btn.dataset.aiReferenceType = "";
+
+    if (!shouldShowAIIcon(item)) {
+      btn.setAttribute("aria-hidden", "true");
+      btn.tabIndex = -1;
+      return;
+    }
+
+    const type = getAIReferenceType(item);
+    const className = getAIReferenceClass(type);
+
+    btn.classList.add("is-visible", className);
+    btn.dataset.aiReferenceType = type;
+    btn.setAttribute("aria-hidden", "false");
+    btn.tabIndex = 0;
+  }
+
+  function openAIImageModal() {
+    ensureAIImageInfoUI();
+
+    if (!DOM.aiImageModal) return;
+
+    DOM.aiImageModal.classList.add("is-open");
+    DOM.aiImageModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("ai-modal-open");
+  }
+
+  function closeAIImageModal() {
+    if (!DOM.aiImageModal) return;
+
+    DOM.aiImageModal.classList.remove("is-open");
+    DOM.aiImageModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("ai-modal-open");
+  }
+
+  function bindAIImageInfoEvents() {
+    ensureAIImageInfoUI();
+
+    if (DOM.aiImageInfoButton && DOM.aiImageInfoButton.dataset.aiBound !== "true") {
+      DOM.aiImageInfoButton.dataset.aiBound = "true";
+
+      DOM.aiImageInfoButton.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openAIImageModal();
+      });
+    }
+
+    if (DOM.aiImageModalClose && DOM.aiImageModalClose.dataset.aiBound !== "true") {
+      DOM.aiImageModalClose.dataset.aiBound = "true";
+
+      DOM.aiImageModalClose.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeAIImageModal();
+      });
+    }
+
+    if (DOM.aiImageModal && DOM.aiImageModal.dataset.aiBound !== "true") {
+      DOM.aiImageModal.dataset.aiBound = "true";
+
+      DOM.aiImageModal.addEventListener("click", (e) => {
+        if (e.target.classList.contains("ai-image-modal__backdrop")) {
+          closeAIImageModal();
+        }
+      });
+    }
   }
 
   function getExtinctSpeciesFormsLabel(speciesList = []) {
@@ -794,6 +1005,9 @@
   enableHorizontalMouseDragScroll(DOM.genusCards);
   enableHorizontalMouseDragScroll(DOM.familyCards);
   bindStickyFamilyGenusScroll();
+
+  ensureAIImageInfoUI();
+  bindAIImageInfoEvents();
 
   // =========================================================
   // CESIUM VIEWER
@@ -1449,6 +1663,8 @@
     if (!item) return;
     activeSpeciesItem = item;
 
+    updateAIImageInfoButton(item);
+
      setPanelImageForItem(item);
 
     U.setText(DOM.panelFamilyLink, item.taxonomy.family);
@@ -1759,6 +1975,8 @@ function renderFamilyCards(speciesList = []) {
 
   async function closeAllPanels() {
     closeSecondaryPanels();
+    closeAIImageModal();
+    updateAIImageInfoButton(null);
     closeAllReferencesAccordions();
     resetAllPanelScrollPositions();
     await restoreDefaultState();
@@ -1809,7 +2027,14 @@ function renderFamilyCards(speciesList = []) {
   DOM.genusCloseBtn?.addEventListener("click", closeAllPanels);
 
   document.addEventListener("keydown", async (e) => {
-    if (e.key === "Escape") await closeAllPanels();
+    if (e.key !== "Escape") return;
+
+    if (DOM.aiImageModal?.classList.contains("is-open")) {
+      closeAIImageModal();
+      return;
+    }
+
+    await closeAllPanels();
   });
 
   // =========================================================
