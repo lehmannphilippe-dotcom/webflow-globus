@@ -713,8 +713,8 @@ body.ai-modal-open {
 
   #species-panel #ai-image-info-button,
   #ai-image-info-button {
-    right: 16px !important;
-    bottom: 16px !important;
+    right: 8px !important;
+    bottom: 8px !important;
   }
 }
 
