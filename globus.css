@@ -544,6 +544,8 @@ body.panel-open #globe {
 
   background: currentColor !important;
 
+  filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4));
+
   -webkit-mask-image: var(--ai-star-icon-mask);
   mask-image: var(--ai-star-icon-mask);
 
