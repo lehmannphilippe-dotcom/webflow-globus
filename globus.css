@@ -484,7 +484,7 @@ body.panel-open #globe {
 #ai-image-info-button {
   position: absolute !important;
   right: 18px !important;
-  bottom: 18px !important;
+  bottom: 32px !important;
   z-index: 12 !important;
 
   display: none !important;
