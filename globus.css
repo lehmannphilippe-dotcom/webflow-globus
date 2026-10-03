@@ -514,15 +514,15 @@ body.panel-open #globe {
 }
 
 #ai-image-info-button.ai-type-fossil {
-  color: #ff8a62 !important;
+  color: #ff8f5B !important;
 }
 
 #ai-image-info-button.ai-type-illustration {
-  color: #63c982 !important;
+  color: #fceb35 !important;
 }
 
 #ai-image-info-button.ai-type-photo-video {
-  color: #7aa2ff !important;
+  color: #4fb9ff !important;
 }
 
 /* Modal */
