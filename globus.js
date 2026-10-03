@@ -419,7 +419,11 @@
           <div class="ai-image-modal__backdrop"></div>
 
           <div class="ai-image-modal__card" role="dialog" aria-modal="true" aria-labelledby="ai-image-modal-title">
-            <button id="ai-image-modal-close" class="ai-image-modal__close" type="button" aria-label="Modal schliessen">×</button>
+            <button id="ai-image-modal-close" class="ai-image-modal__close" type="button" aria-label="Modal schliessen">
+              <svg class="ai-image-modal__close-icon" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M19 6.41L17.59 5L12 10.59L6.41 5L5 6.41L10.59 12L5 17.59L6.41 19L12 13.41L17.59 19L19 17.59L13.41 12L19 6.41Z" fill="currentColor"/>
+              </svg>
+            </button>
 
             <h2 id="ai-image-modal-title">KI-generierte Bilder</h2>
 
@@ -490,9 +494,9 @@
     const type = getAIReferenceType(item);
     const className = getAIReferenceClass(type);
     const colorByType = {
-      fossil: "#ff8a62",
-      illustration: "#63c982",
-      photo_video: "#7aa2ff"
+      fossil: "#FF8F5B",
+      illustration: "#FCEB35",
+      photo_video: "#4FB9FF"
     };
 
     btn.classList.add("is-visible", className);
