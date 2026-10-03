@@ -642,7 +642,7 @@ body.panel-open #globe {
 .ai-image-modal__legend-item {
   display: grid;
   grid-template-columns: 24px 1fr !important;
-  gap: 18px;
+  gap: 8px;
 }
 
 .ai-image-modal__legend-icon {
