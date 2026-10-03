@@ -665,3 +665,19 @@ body.ai-modal-open {
     bottom: 16px !important;
   }
 }
+
+/* ---------------------------------
+   AI MODAL: COLORED LEGEND TITLES
+--------------------------------- */
+
+.ai-image-modal__legend-icon.ai-type-fossil + div h3 {
+  color: #ff8a62 !important;
+}
+
+.ai-image-modal__legend-icon.ai-type-illustration + div h3 {
+  color: #63c982 !important;
+}
+
+.ai-image-modal__legend-icon.ai-type-photo-video + div h3 {
+  color: #7aa2ff !important;
+}
