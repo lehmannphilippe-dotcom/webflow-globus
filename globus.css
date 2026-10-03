@@ -506,6 +506,7 @@ body.panel-open #globe {
   border-radius: 0 !important;
   box-shadow: none !important;
   outline: none !important;
+  overflow: visible !important;
 
   appearance: none !important;
   -webkit-appearance: none !important;
