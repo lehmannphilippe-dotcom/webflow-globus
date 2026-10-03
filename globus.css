@@ -821,17 +821,17 @@ body.ai-modal-open {
 #ai-image-info-button.ai-type-fossil,
 .ai-image-modal__legend-icon.ai-type-fossil,
 .ai-image-modal__legend-icon.ai-type-fossil + div h3 {
-  color: #ff8a62 !important;
+  color: #ff8f5b !important;
 }
 
 #ai-image-info-button.ai-type-illustration,
 .ai-image-modal__legend-icon.ai-type-illustration,
 .ai-image-modal__legend-icon.ai-type-illustration + div h3 {
-  color: #63c982 !important;
+  color: #fceb35 !important;
 }
 
 #ai-image-info-button.ai-type-photo-video,
 .ai-image-modal__legend-icon.ai-type-photo-video,
 .ai-image-modal__legend-icon.ai-type-photo-video + div h3 {
-  color: #7aa2ff !important;
+  color: #4fb9ff !important;
 }
