@@ -619,15 +619,15 @@ body.panel-open #globe {
 }
 
 .ai-image-modal__legend-icon.ai-type-fossil {
-  color: #ff8a62;
+  color: #ff8f5b;
 }
 
 .ai-image-modal__legend-icon.ai-type-illustration {
-  color: #63c982;
+  color: #fceb35;
 }
 
 .ai-image-modal__legend-icon.ai-type-photo-video {
-  color: #7aa2ff;
+  color: #4fb9ff;
 }
 
 .ai-image-modal__legend-item h3 {
