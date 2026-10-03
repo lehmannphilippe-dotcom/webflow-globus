@@ -17,7 +17,7 @@
   visibility: visible !important;
 }
 
-/* Species-Panel öffnet immer */
+/* Species-Panel Ã¶ffnet immer */
 body.panel-open #species-panel {
   transform: translate3d(0, 0, 0) !important;
   pointer-events: auto !important;
@@ -31,7 +31,7 @@ body.panel-open #species-panel {
   pointer-events: none !important;
 }
 
-/* Secondary Panels öffnen nur mit .is-open */
+/* Secondary Panels Ã¶ffnen nur mit .is-open */
 body.panel-open #family-panel.is-open,
 body.panel-open #genus-panel.is-open {
   transform: translate3d(0, 0, 0) !important;
@@ -388,15 +388,15 @@ body.panel-open #globe {
   text-decoration: underline !important;
 }
 
-/* Alter separater Sticky-Link wird nicht mehr benötigt */
+/* Alter separater Sticky-Link wird nicht mehr benÃ¶tigt */
 #family-sticky-genus-link {
   display: none !important;
 }
 /* ---------------------------------
-   FAMILY PANEL: 24PX START + FRÜHER STICKY-AUSSTIEG
+   FAMILY PANEL: 24PX START + FRÃœHER STICKY-AUSSTIEG
 --------------------------------- */
 
-/* Kein zusätzlicher Abstand zwischen 24px-Startspacer und erster Gattungsgruppe */
+/* Kein zusÃ¤tzlicher Abstand zwischen 24px-Startspacer und erster Gattungsgruppe */
 #family-cards {
   gap: 0 !important;
 }
@@ -416,7 +416,7 @@ body.panel-open #globe {
   margin-right: 8px !important;
 }
 
-/* Begrenzter Sticky-Bereich für den Gattungsnamen */
+/* Begrenzter Sticky-Bereich fÃ¼r den Gattungsnamen */
 .family-genus-label-track {
   position: relative !important;
   display: block !important;
@@ -591,7 +591,7 @@ body.panel-open #globe {
 .ai-image-modal__card p {
   margin: 0;
   color: #97b4e4;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 300;
   line-height: 1.45;
 }
@@ -666,18 +666,172 @@ body.ai-modal-open {
   }
 }
 
+
 /* ---------------------------------
-   AI MODAL: COLORED LEGEND TITLES
+   AI IMAGE INFO BUTTON HARD OVERRIDE
+   Entfernt Webflow-Button-Defaults und verhindert Balken/FarbflÃ¤chen.
 --------------------------------- */
 
+#species-panel #ai-image-info-button,
+#ai-image-info-button {
+  position: absolute !important;
+  right: 18px !important;
+  bottom: 18px !important;
+  z-index: 12 !important;
+
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+
+  padding: 0 !important;
+  margin: 0 !important;
+
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+
+  overflow: visible !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: 0 !important;
+  color: #63c982 !important;
+  cursor: pointer !important;
+}
+
+#species-panel #ai-image-info-button.is-visible,
+#ai-image-info-button.is-visible {
+  display: flex !important;
+}
+
+#species-panel #ai-image-info-button svg,
+#ai-image-info-button svg,
+#species-panel #ai-image-info-button .ai-image-info-svg,
+#ai-image-info-button .ai-image-info-svg {
+  width: 24px !important;
+  height: 24px !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  color: inherit !important;
+  fill: currentColor !important;
+  overflow: visible !important;
+}
+
+#species-panel #ai-image-info-button svg *,
+#ai-image-info-button svg * {
+  fill: currentColor !important;
+}
+
+
+/* ---------------------------------
+   AI ICON: SHARED CUSTOM STAR MASK
+   Verwendet Vector.svg als zentrale Form fÃ¼r Bild-Icon und Legende.
+--------------------------------- */
+
+:root {
+  --ai-star-icon-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2025%2025%22%3E%3Cpath%20d%3D%22M13.6771%2024.5324C12.8088%2025.3595%2011.4966%2025.0294%2010.9501%2024.0123C10.2832%2022.7709%209.81089%2021.3576%209.12648%2020.1099C8.07609%2018.195%206.44045%2016.6526%204.49826%2015.6649C3.35685%2015.0844%202.05341%2014.6297%200.945149%2014.0248C-0.40115%2013.29%20-0.264455%2011.6023%201.0709%2010.9038C3.1479%209.81698%205.13169%209.30313%206.93186%207.66081C9.13461%205.6511%209.61257%203.5716%2010.9085%201.06181C11.2035%200.490689%2011.6195%200.0694698%2012.2964%200.00938499C13.1588%20-0.0669728%2013.7103%200.326082%2014.09%201.06181C15.3819%203.56409%2015.8583%205.63889%2018.0507%207.64547C19.8437%209.28685%2021.8478%209.82198%2023.9276%2010.9038C25.3484%2011.6427%2025.3665%2013.361%2023.9276%2014.0871C20.9607%2015.5842%2018.6957%2016.0971%2016.6028%2018.9636C15.4598%2020.529%2014.9458%2022.3415%2014.0487%2024.0129C13.9574%2024.1832%2013.816%2024.4007%2013.6771%2024.5331V24.5324Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+}
+
+#species-panel .panel-image-wrap,
+.panel-image-wrap {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#species-panel #ai-image-info-button,
+#ai-image-info-button {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  overflow: visible !important;
+}
+
+#species-panel #ai-image-info-button svg,
+#ai-image-info-button svg,
+#species-panel #ai-image-info-button .ai-image-info-svg,
+#ai-image-info-button .ai-image-info-svg {
+  display: none !important;
+}
+
+#ai-image-info-button::before {
+  content: "";
+  display: block !important;
+  width: 24px !important;
+  height: 24px !important;
+  flex: 0 0 auto !important;
+  background: currentColor !important;
+
+  -webkit-mask-image: var(--ai-star-icon-mask);
+  mask-image: var(--ai-star-icon-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.ai-image-modal__legend-item {
+  grid-template-columns: 24px 1fr !important;
+}
+
+.ai-image-modal__legend-icon {
+  width: 24px !important;
+  height: 24px !important;
+  margin-top: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.ai-image-modal__legend-icon::before {
+  content: "";
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  background: currentColor !important;
+
+  -webkit-mask-image: var(--ai-star-icon-mask);
+  mask-image: var(--ai-star-icon-mask);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+#ai-image-info-button.ai-type-fossil,
+.ai-image-modal__legend-icon.ai-type-fossil,
 .ai-image-modal__legend-icon.ai-type-fossil + div h3 {
   color: #ff8a62 !important;
 }
 
+#ai-image-info-button.ai-type-illustration,
+.ai-image-modal__legend-icon.ai-type-illustration,
 .ai-image-modal__legend-icon.ai-type-illustration + div h3 {
   color: #63c982 !important;
 }
 
+#ai-image-info-button.ai-type-photo-video,
+.ai-image-modal__legend-icon.ai-type-photo-video,
 .ai-image-modal__legend-icon.ai-type-photo-video + div h3 {
   color: #7aa2ff !important;
 }
