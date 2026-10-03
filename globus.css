@@ -571,15 +571,21 @@ body.panel-open #globe {
   inset: 0;
   z-index: 2000;
 
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
 
   padding: 32px;
+
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .ai-image-modal.is-open {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .ai-image-modal__backdrop {
