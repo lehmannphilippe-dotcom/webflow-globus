@@ -508,6 +508,9 @@ body.panel-open #globe {
   outline: none !important;
   overflow: visible !important;
 
+  -webkit-filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4)) !important;
+  filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4)) !important;
+
   appearance: none !important;
   -webkit-appearance: none !important;
 
@@ -545,7 +548,7 @@ body.panel-open #globe {
 
   background: currentColor !important;
 
-  filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4));
+  filter: none !important;
 
   -webkit-mask-image: var(--ai-star-icon-mask);
   mask-image: var(--ai-star-icon-mask);
