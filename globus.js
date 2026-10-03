@@ -378,18 +378,37 @@
 
     DOM.aiImageInfoButton = btn || null;
 
+    if (btn && btn.dataset.aiBaseStyleApplied !== "true") {
+      btn.dataset.aiBaseStyleApplied = "true";
+      btn.style.position = "absolute";
+      btn.style.right = "18px";
+      btn.style.bottom = "18px";
+      btn.style.zIndex = "12";
+      btn.style.width = "28px";
+      btn.style.height = "28px";
+      btn.style.minWidth = "0";
+      btn.style.minHeight = "0";
+      btn.style.padding = "0";
+      btn.style.margin = "0";
+      btn.style.background = "transparent";
+      btn.style.backgroundColor = "transparent";
+      btn.style.border = "0";
+      btn.style.boxShadow = "none";
+      btn.style.fontSize = "0";
+      btn.style.lineHeight = "0";
+      btn.style.display = "none";
+      btn.style.alignItems = "center";
+      btn.style.justifyContent = "center";
+      btn.style.overflow = "visible";
+    }
+
     if (btn && btn.dataset.aiSvgInjected !== "true") {
       btn.dataset.aiSvgInjected = "true";
       btn.type = "button";
       btn.setAttribute("aria-label", "Informationen zu KI-generiertem Bild");
-      btn.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 22 22" aria-hidden="true" focusable="false">
-          <path
-            d="M11 1.5C12.6 6.2 15.8 9.4 20.5 11C15.8 12.6 12.6 15.8 11 20.5C9.4 15.8 6.2 12.6 1.5 11C6.2 9.4 9.4 6.2 11 1.5Z"
-            fill="currentColor"
-          />
-        </svg>
-      `;
+      // Icon wird nicht mehr als Inline-SVG erzeugt.
+      // Die Sternform kommt zentral aus globus.css als CSS mask.
+      btn.innerHTML = "";
     }
 
     if (!document.getElementById("ai-image-modal")) {
@@ -415,7 +434,7 @@
                 <span class="ai-image-modal__legend-icon ai-type-fossil"></span>
                 <div>
                   <h3>Fossiles Referenzmaterial</h3>
-                  <p>Die Rekonstruktion basiert ausschliesslich auf fossilem oder subfossilem Material. Schnabelform und Körperbau können daraus teilweise abgeleitet werden, während insbesondere Färbung, Gefieder und andere äussere Merkmale mit grossen Unsicherheiten verbunden sind.</p>
+                  <p>Die Rekonstruktion basiert ausschliesslich auf fossilem oder subfossilem Material.</p>
                 </div>
               </div>
 
@@ -423,7 +442,7 @@
                 <span class="ai-image-modal__legend-icon ai-type-illustration"></span>
                 <div>
                   <h3>Wissenschaftliche Illustrationen und Museumspräparate</h3>
-                  <p>Als visuelle Referenzen stehen auch wissenschaftliche/historische Illustrationen und/oder erhaltene Museumspräparate und Bälge zur Verfügung. Sie ermöglichen eine fundiertere Rekonstruktion, können jedoch bei Farben, Haltung und Erscheinungsbild von einem lebenden Tier abweichen.</p>
+                  <p>Als visuelle Referenzen stehen wissenschaftliche Illustrationen und/oder Museumspräparate zur Verfügung.</p>
                 </div>
               </div>
 
@@ -431,7 +450,7 @@
                 <span class="ai-image-modal__legend-icon ai-type-photo-video"></span>
                 <div>
                   <h3>Foto- und Videomaterial</h3>
-                  <p>Das Aussehen der Art ist auch durch historische Fotografien und/oder Filmaufnahmen dokumentiert. Diese bieten die direkteste visuelle Referenz, wobei je nach Qualität, Alter und Umfang des Materials dennoch einzelne Details unsicher bleiben können.</p>
+                  <p>Das Aussehen der Art ist auch durch historisches Foto- und/oder Filmmaterial dokumentiert.</p>
                 </div>
               </div>
             </div>
@@ -459,6 +478,8 @@
     );
 
     btn.dataset.aiReferenceType = "";
+    btn.style.display = "none";
+    btn.style.color = "";
 
     if (!shouldShowAIIcon(item)) {
       btn.setAttribute("aria-hidden", "true");
@@ -468,9 +489,16 @@
 
     const type = getAIReferenceType(item);
     const className = getAIReferenceClass(type);
+    const colorByType = {
+      fossil: "#ff8a62",
+      illustration: "#63c982",
+      photo_video: "#7aa2ff"
+    };
 
     btn.classList.add("is-visible", className);
     btn.dataset.aiReferenceType = type;
+    btn.style.display = "flex";
+    btn.style.color = colorByType[type] || "";
     btn.setAttribute("aria-hidden", "false");
     btn.tabIndex = 0;
   }
