@@ -415,7 +415,7 @@
                 <span class="ai-image-modal__legend-icon ai-type-fossil"></span>
                 <div>
                   <h3>Fossiles Referenzmaterial</h3>
-                  <p>Die Rekonstruktion basiert ausschliesslich auf fossilem oder subfossilem Material.</p>
+                  <p>Die Rekonstruktion basiert ausschliesslich auf fossilem oder subfossilem Material. Schnabelform und Körperbau können daraus teilweise abgeleitet werden, während insbesondere Färbung, Gefieder und andere äussere Merkmale mit grossen Unsicherheiten verbunden sind.</p>
                 </div>
               </div>
 
@@ -423,7 +423,7 @@
                 <span class="ai-image-modal__legend-icon ai-type-illustration"></span>
                 <div>
                   <h3>Wissenschaftliche Illustrationen und Museumspräparate</h3>
-                  <p>Als visuelle Referenzen stehen wissenschaftliche Illustrationen und/oder Museumspräparate zur Verfügung.</p>
+                  <p>Als visuelle Referenzen stehen auch wissenschaftliche/historische Illustrationen und/oder erhaltene Museumspräparate und Bälge zur Verfügung. Sie ermöglichen eine fundiertere Rekonstruktion, können jedoch bei Farben, Haltung und Erscheinungsbild von einem lebenden Tier abweichen.</p>
                 </div>
               </div>
 
@@ -431,7 +431,7 @@
                 <span class="ai-image-modal__legend-icon ai-type-photo-video"></span>
                 <div>
                   <h3>Foto- und Videomaterial</h3>
-                  <p>Das Aussehen der Art ist auch durch historisches Foto- und/oder Filmmaterial dokumentiert.</p>
+                  <p>Das Aussehen der Art ist auch durch historische Fotografien und/oder Filmaufnahmen dokumentiert. Diese bieten die direkteste visuelle Referenz, wobei je nach Qualität, Alter und Umfang des Materials dennoch einzelne Details unsicher bleiben können.</p>
                 </div>
               </div>
             </div>
