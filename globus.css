@@ -427,8 +427,8 @@ body.panel-open #globe {
 
 /* Label klebt bei exakt 24px */
 .family-genus-label-track .family-genus-label {
-  position: sticky !important;
-  left: 24px !important;
+  position: relative !important;
+  left: auto !important;
   z-index: 5 !important;
 }
 
