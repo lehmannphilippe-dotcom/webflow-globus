@@ -139,6 +139,10 @@ body.panel-open #globe {
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
+
+    /* Rechter Innenabstand auf kleinen Screens, damit Text nicht am Rand klebt. */
+    padding-right: calc(28px + env(safe-area-inset-right, 0px)) !important;
+    box-sizing: border-box !important;
   }
 
   body.panel-open #globe {
