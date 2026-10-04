@@ -864,3 +864,27 @@ body.ai-modal-open {
 .ai-image-modal__legend-icon.ai-type-photo-video + div h3 {
   color: #4FB9FF !important;
 }
+
+/* ---------------------------------
+   MOBILE PANEL CLOSE BUTTON FIX
+--------------------------------- */
+
+@media (max-width: 860px) {
+  #panel-close,
+  .panel-close,
+  #family-close,
+  #genus-close {
+    position: fixed !important;
+    top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+    right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+
+    z-index: 9999 !important;
+
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+
+    transform: none !important;
+  }
+}
