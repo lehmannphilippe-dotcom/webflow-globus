@@ -876,7 +876,7 @@ body.ai-modal-open {
   #genus-close {
     position: fixed !important;
     top: calc(18px + env(safe-area-inset-top, 0px)) !important;
-    right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+    right: calc(28px + env(safe-area-inset-right, 0px)) !important;
 
     z-index: 9999 !important;
 
