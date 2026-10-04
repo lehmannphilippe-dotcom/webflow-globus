@@ -479,7 +479,7 @@ body.panel-open #globe {
   width: 100% !important;
 }
 
-/* Leerer Webflow-Button, Icon kommt über ::before */
+/* Leerer Webflow-Button, Icon kommt über ::before; Shadow kommt über ::after */
 #species-panel #ai-image-info-button,
 #ai-image-info-button {
   position: absolute !important;
@@ -508,13 +508,12 @@ body.panel-open #globe {
   outline: none !important;
   overflow: visible !important;
 
-  -webkit-filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4)) !important;
-  filter: drop-shadow(0 0 20px rgba(0, 0, 0, 0.4)) !important;
+  -webkit-filter: none !important;
+  filter: none !important;
 
   appearance: none !important;
   -webkit-appearance: none !important;
 
-  overflow: visible !important;
   font-size: 0 !important;
   line-height: 0 !important;
   text-indent: 0 !important;
@@ -536,18 +535,58 @@ body.panel-open #globe {
   display: none !important;
 }
 
-/* Stern auf dem Vogelbild */
+/* Schatten-Layer hinter dem Stern auf dem Vogelbild */
+#species-panel #ai-image-info-button::after,
+#ai-image-info-button::after {
+  content: "";
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  z-index: 1 !important;
+  display: block !important;
+
+  width: 72px !important;
+  height: 72px !important;
+
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none !important;
+
+  background: rgba(0, 0, 0, 0.4) !important;
+  -webkit-filter: blur(20px) !important;
+  filter: blur(20px) !important;
+
+  -webkit-mask-image: var(--ai-star-icon-mask);
+  mask-image: var(--ai-star-icon-mask);
+
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+
+  -webkit-mask-position: center;
+  mask-position: center;
+
+  -webkit-mask-size: 24px 24px;
+  mask-size: 24px 24px;
+}
+
+/* Farbiger Stern auf dem Vogelbild */
 #species-panel #ai-image-info-button::before,
 #ai-image-info-button::before {
   content: "";
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  z-index: 2 !important;
   display: block !important;
 
   width: 24px !important;
   height: 24px !important;
   flex: 0 0 auto !important;
 
-  background: currentColor !important;
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none !important;
 
+  background: currentColor !important;
+  -webkit-filter: none !important;
   filter: none !important;
 
   -webkit-mask-image: var(--ai-star-icon-mask);
