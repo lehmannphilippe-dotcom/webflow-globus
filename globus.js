@@ -2192,6 +2192,19 @@ function renderFamilyCards(speciesList = []) {
     document.body.appendChild(brand);
   }
 
+  // View switcher: visual placeholder; globe remains selected.
+  if (!document.getElementById('globe-view-switch')) {
+    const viewSwitch = document.createElement('div');
+    viewSwitch.id = 'globe-view-switch';
+    viewSwitch.setAttribute('role', 'group');
+    viewSwitch.setAttribute('aria-label', 'Ansicht');
+    viewSwitch.innerHTML = `
+      <button type="button" class="gv-tab gv-grid" aria-label="Kartenübersicht" aria-pressed="false"><span aria-hidden="true"></span></button>
+      <button type="button" class="gv-tab gv-globe is-active" aria-label="Globus" aria-pressed="true"><span aria-hidden="true"></span></button>`;
+    viewSwitch.addEventListener('click', (event) => event.stopPropagation());
+    document.body.appendChild(viewSwitch);
+  }
+
   const searchRoot = document.createElement('section');
   searchRoot.id = 'globe-search';
   searchRoot.setAttribute('aria-label', 'Suche');
