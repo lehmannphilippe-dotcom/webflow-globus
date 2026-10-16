@@ -2241,11 +2241,40 @@ function renderFamilyCards(speciesList = []) {
     if (searchRoot.classList.contains('is-open')) renderSearchResults();
   }
 
-  function makeSearchResult(entry) {
+  function snapshotSearchTooltipStyles() {
+    if (!DOM.tip) return [];
+    // Preserve the source's rendered Webflow styles before IDs are removed.
+    // This also supports rules scoped to #species-tooltip / #tooltip-card.
+    const properties = [
+      'display', 'flex-direction', 'flex-wrap', 'align-items', 'align-content',
+      'justify-content', 'gap', 'row-gap', 'column-gap', 'padding', 'margin',
+      'background-color', 'background-image', 'background-size',
+      'background-position', 'background-repeat', 'border', 'border-radius',
+      'box-shadow', 'color', 'font-family', 'font-size', 'font-weight',
+      'font-style', 'line-height', 'letter-spacing', 'text-align',
+      'text-transform', 'text-decoration', 'object-fit', 'object-position'
+    ];
+    return [DOM.tip, ...DOM.tip.querySelectorAll('*')].map((element) => {
+      const style = getComputedStyle(element);
+      const values = properties.map((property) => [property, style.getPropertyValue(property)]);
+      if (element.tagName === 'IMG') {
+        ['width', 'height', 'border-radius'].forEach((property) => {
+          const value = style.getPropertyValue(property);
+          if (property === 'border-radius' || parseFloat(value) > 0) values.push([property, value]);
+        });
+      }
+      return values;
+    });
+  }
+
+  function makeSearchResult(entry, tooltipStyles) {
     const { item, type, species } = entry;
     // Keep the complete Webflow subtree: no new text wrappers or card layout.
     if (!DOM.tip) return null;
     const card = DOM.tip.cloneNode(true);
+    [card, ...card.querySelectorAll('*')].forEach((element, index) => {
+      (tooltipStyles[index] || []).forEach(([property, value]) => element.style.setProperty(property, value));
+    });
     const avatar = card.querySelector('[id="tooltip-avatar"]');
     const title = card.querySelector('[id="tooltip-name-de"]');
     const latin = card.querySelector('[id="tooltip-name-lat"]');
@@ -2270,8 +2299,18 @@ function renderFamilyCards(speciesList = []) {
     });
     card.removeAttribute('aria-hidden');
     card.classList.add('gs-card');
-    const tooltipSurface = card.querySelector('.tooltip-card');
-    if (tooltipSurface) tooltipSurface.classList.add('gs-tooltip-surface');
+    // Find the existing common container even if Webflow class names differ.
+    let tooltipSurface = avatar?.parentElement || card;
+    while (tooltipSurface !== card && title && !tooltipSurface.contains(title)) {
+      tooltipSurface = tooltipSurface.parentElement;
+    }
+    tooltipSurface.classList.add('gs-tooltip-surface');
+    if (avatar) avatar.classList.add('gs-source-avatar');
+    if (title) {
+      let textColumn = title.parentElement;
+      while (textColumn && textColumn.parentElement !== tooltipSurface && textColumn !== tooltipSurface) textColumn = textColumn.parentElement;
+      if (textColumn && textColumn !== tooltipSurface) textColumn.classList.add('gs-source-text');
+    }
     card.setAttribute('role', 'button');
     card.tabIndex = 0;
     card.setAttribute('aria-label', `${type === 'species' ? 'Art' : type === 'genus' ? 'Gattung' : 'Familie'}: ${item.name?.de || item.name?.lat || item.id}`);
@@ -2334,8 +2373,9 @@ function renderFamilyCards(speciesList = []) {
     const rank = (entry) => entry.names.includes(query) ? 0 : entry.names.some((name) => name.startsWith(query)) ? 1 : 2;
     matches.sort((a, b) => rank(a) - rank(b) || compareText(a.item.name?.de || a.item.name?.lat, b.item.name?.de || b.item.name?.lat));
     const fragment = document.createDocumentFragment();
+    const tooltipStyles = snapshotSearchTooltipStyles();
     matches.forEach((entry) => {
-      const card = makeSearchResult(entry);
+      const card = makeSearchResult(entry, tooltipStyles);
       if (card) fragment.appendChild(card);
     });
     searchResults.appendChild(fragment);
