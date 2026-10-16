@@ -1043,3 +1043,14 @@ body::-webkit-scrollbar,
 }
 #globe-search .gs-source-avatar,
 #globe-search .gs-count { align-self: center; }
+
+/* Full-width result chain: override intrinsic Webflow wrapper sizing. */
+#globe-search .gs-results { align-items: stretch !important; }
+#globe-search .gs-results > .gs-card,
+#globe-search .gs-full-width {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+  align-self: stretch !important;
+}
