@@ -2305,6 +2305,22 @@ function renderFamilyCards(speciesList = []) {
       tooltipSurface = tooltipSurface.parentElement;
     }
     tooltipSurface.classList.add('gs-tooltip-surface');
+    // Webflow may attach width/max-content or inline-flex sizing to any
+    // wrapper between the result root and the painted tooltip surface.
+    // Stretch the whole chain, including the surface, in normal block flow.
+    let widthNode = tooltipSurface;
+    while (widthNode) {
+      widthNode.classList.add('gs-full-width');
+      widthNode.style.setProperty('width', '100%', 'important');
+      widthNode.style.setProperty('min-width', '0', 'important');
+      widthNode.style.setProperty('max-width', 'none', 'important');
+      widthNode.style.setProperty('box-sizing', 'border-box', 'important');
+      if (widthNode !== tooltipSurface) widthNode.style.setProperty('display', 'block', 'important');
+      if (widthNode === card) break;
+      widthNode = widthNode.parentElement;
+    }
+    tooltipSurface.style.setProperty('display', 'flex', 'important');
+    tooltipSurface.style.setProperty('flex-direction', 'row', 'important');
     if (avatar) avatar.classList.add('gs-source-avatar');
     if (title) {
       let textColumn = title.parentElement;
