@@ -2243,48 +2243,71 @@ function renderFamilyCards(speciesList = []) {
 
   function makeSearchResult(entry) {
     const { item, type, species } = entry;
-    const card = DOM.tip ? DOM.tip.cloneNode(true) : document.createElement('div');
-    const avatar = card.querySelector('[id="tooltip-avatar"]') || document.createElement('img');
-    const title = card.querySelector('[id="tooltip-name-de"]') || document.createElement('div');
-    const latin = card.querySelector('[id="tooltip-name-lat"]') || document.createElement('div');
-    const date = card.querySelector('[id="tooltip-lastseen"]') || document.createElement('div');
+    // Keep the complete Webflow subtree: no new text wrappers or card layout.
+    if (!DOM.tip) return null;
+    const card = DOM.tip.cloneNode(true);
+    const avatar = card.querySelector('[id="tooltip-avatar"]');
+    const title = card.querySelector('[id="tooltip-name-de"]');
+    const latin = card.querySelector('[id="tooltip-name-lat"]');
+    const date = card.querySelector('[id="tooltip-lastseen"]');
+
+    // Allow text and its existing Webflow wrappers to grow. Preserve their
+    // display, typography, spacing, background, image and border styling.
+    [title, latin, date].filter(Boolean).forEach((field) => {
+      field.classList.add('gs-text-flow');
+      let parent = field.parentElement;
+      while (parent && parent !== card) {
+        parent.classList.add('gs-text-container');
+        parent = parent.parentElement;
+      }
+    });
     [card, ...card.querySelectorAll('*')].forEach((el) => {
       el.removeAttribute('id');
-      el.removeAttribute('style');
-      el.removeAttribute('aria-hidden');
       el.removeAttribute('data-w-id');
+      // IDs of the live tooltip must not be referenced by a result clone.
+      el.removeAttribute('aria-labelledby');
+      el.removeAttribute('aria-describedby');
     });
+    card.removeAttribute('aria-hidden');
     card.classList.add('gs-card');
     card.setAttribute('role', 'button');
     card.tabIndex = 0;
     card.setAttribute('aria-label', `${type === 'species' ? 'Art' : type === 'genus' ? 'Gattung' : 'Familie'}: ${item.name?.de || item.name?.lat || item.id}`);
-    title.classList.add('gs-name');
-    latin.classList.add('gs-latin');
-    date.classList.add('gs-date');
     U.setText(title, item.name?.de || item.name?.lat || item.id);
     U.setText(latin, item.name?.lat || '');
+    // The original Webflow date row already owns its extinction symbol.
     const dateValue = item.extinction_date || item.last_seen || '';
-    U.setText(date, dateValue ? `† ${dateValue}` : '');
-    date.hidden = !dateValue;
-    const text = document.createElement('div');
-    text.className = 'gs-card-text';
-    text.append(title, latin, date);
-    let visual = avatar;
-    if (type === 'species') {
-      avatar.classList.add('gs-avatar');
+    U.setText(date, dateValue);
+    if (date) {
+      const dateRow = date.closest('.last-seen-content');
+      (dateRow || date).hidden = !dateValue;
+    }
+    if (avatar && type === 'species') {
       U.setWFImage(avatar, item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG);
       if (avatar.tagName === 'IMG') { avatar.alt = ''; avatar.loading = 'lazy'; }
-    } else {
-      visual = document.createElement('div');
-      visual.className = 'gs-count';
+    } else if (avatar) {
+      // Replace only the avatar; retain its Webflow classes and its parent.
+      const count = document.createElement('div');
+      count.className = avatar.className;
+      count.classList.add('gs-count');
+      const avatarStyle = getComputedStyle(DOM.tipImg || avatar);
+      if (parseFloat(avatarStyle.width) > 0 && avatarStyle.width.endsWith('px')) {
+        count.style.width = avatarStyle.width;
+      }
+      if (parseFloat(avatarStyle.height) > 0 && avatarStyle.height.endsWith('px')) {
+        count.style.height = avatarStyle.height;
+      }
       const number = document.createElement('strong');
       number.textContent = species.length;
       const label = document.createElement('span');
       label.textContent = species.length === 1 ? 'Art' : 'Arten';
-      visual.append(number, label);
+      count.append(number, label);
+      avatar.replaceWith(count);
     }
-    card.replaceChildren(visual, text);
-    card.addEventListener('click', () => openSearchResult(entry));
+    card.addEventListener('click', (event) => {
+      event.preventDefault();
+      openSearchResult(entry);
+    });
     card.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
@@ -2309,7 +2332,10 @@ function renderFamilyCards(speciesList = []) {
     const rank = (entry) => entry.names.includes(query) ? 0 : entry.names.some((name) => name.startsWith(query)) ? 1 : 2;
     matches.sort((a, b) => rank(a) - rank(b) || compareText(a.item.name?.de || a.item.name?.lat, b.item.name?.de || b.item.name?.lat));
     const fragment = document.createDocumentFragment();
-    matches.forEach((entry) => fragment.appendChild(makeSearchResult(entry)));
+    matches.forEach((entry) => {
+      const card = makeSearchResult(entry);
+      if (card) fragment.appendChild(card);
+    });
     searchResults.appendChild(fragment);
     if (!matches.length) {
       const empty = document.createElement('p');
