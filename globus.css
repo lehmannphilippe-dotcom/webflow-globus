@@ -906,8 +906,8 @@ body.panel-open:has(#family-panel.is-open) #species-panel { pointer-events: none
 #globe-search input::-webkit-search-cancel-button { display: none; }
 #globe-search .gs-close { display: none; flex: 0 0 34px; width: 34px; height: 42px; padding: 0; border: 0; margin: 0; background: transparent; cursor: pointer; align-items: flex-start; justify-content: center; }
 #globe-search .gs-close span { display: block; width: 24px; height: 24px; background: var(--gs-close-icon) center / 24px 24px no-repeat; }
-#globe-search .gs-results { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; max-height: calc(100dvh - 74px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; color: #97b4e4; }
-#globe-search .gs-card { position: relative !important; inset: auto !important; display: flex !important; flex-direction: row !important; align-items: center !important; gap: 11px !important; flex: 0 0 auto; width: 100% !important; min-width: 0 !important; max-width: none !important; min-height: 128px; height: auto !important; padding: 12px 10px !important; margin: 0 !important; opacity: 1 !important; visibility: visible !important; transform: none !important; pointer-events: auto !important; border: 0; border-radius: 18px; background: #121641; color: #fff; text-align: left; cursor: pointer; overflow: hidden; }
+#globe-search .gs-results { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; max-height: calc(100dvh - 74px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; -ms-overflow-style: none; color: #97b4e4; }
+#globe-search .gs-card { position: relative !important; inset: auto !important; display: flex !important; flex-direction: row !important; align-items: center !important; gap: 11px !important; flex: 0 0 auto; width: 100% !important; min-width: 0 !important; max-width: none !important; min-height: 128px; height: auto !important; max-height: none !important; padding: 12px 10px !important; margin: 0 !important; opacity: 1 !important; visibility: visible !important; transform: none !important; pointer-events: auto !important; border: 0; border-radius: 18px; background: #121641; color: #fff; text-align: left; cursor: pointer; overflow: hidden; }
 #globe-search .gs-avatar, #globe-search .gs-count { position: relative !important; inset: auto !important; display: flex !important; flex: 0 0 100px !important; width: 100px !important; height: 100px !important; min-width: 100px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important; object-fit: cover; background-size: cover; background-position: center; overflow: hidden; }
 #globe-search .gs-count { flex-direction: column; align-items: center; justify-content: center; background: #8797cc; color: #121641; font-family: Inter, sans-serif; }
 #globe-search .gs-count strong { font-size: 40px; font-weight: 600; line-height: 40px; }
@@ -918,7 +918,7 @@ body.panel-open:has(#family-panel.is-open) #species-panel { pointer-events: none
 #globe-search .gs-date { margin: 0 !important; padding: 0 !important; color: #ff5100; font: 500 14px/20px Inter, sans-serif; }
 #globe-search .gs-message { margin: 0; padding: 20px; border-radius: 12px; background: #121641; }
 #globe-search .gs-sr { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-#globe-search button:focus-visible, #globe-search .gs-card:focus-visible, #globe-search .gs-field:focus-within { outline: 2px solid #ff5100; outline-offset: -2px; }
+#globe-search button:focus-visible, #globe-search .gs-card:focus-visible, #globe-search .gs-field:focus-within { outline: 1px solid #ff5100; outline-offset: -1px; }
 #globe-search .gs-card:hover { background: #1f2552; }
 body.panel-open #globe-search { display: none; }
 @media (max-width: 860px) {
@@ -935,3 +935,51 @@ body.panel-open #globe-search { display: none; }
   body.globe-search-open { overflow: hidden; }
 }
 @media (prefers-reduced-motion: reduce) { #globe-search * { scroll-behavior: auto !important; } }
+
+/* Search corrections: hide scrollbars while preserving scrolling. */
+html, body { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#globe-search .gs-results::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Tooltip classes may impose fixed heights or positioning in Webflow.
+   In result cards all text participates in normal, non-shrinking flow. */
+#globe-search .gs-card-text {
+  position: relative !important;
+  inset: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 1 1 0% !important;
+  gap: 5px;
+}
+#globe-search .gs-name,
+#globe-search .gs-latin,
+#globe-search .gs-date {
+  position: static !important;
+  inset: auto !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset;
+  transform: none !important;
+}
+#globe-search .gs-name { line-height: 1.2 !important; }
+#globe-search .gs-latin,
+#globe-search .gs-date { line-height: 20px !important; }
+/* Preserve the optional date's hidden state despite the text reset. */
+#globe-search .gs-date[hidden] { display: none !important; }
