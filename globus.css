@@ -1111,7 +1111,7 @@ body::-webkit-scrollbar,
 #globe-brand .gb-info:focus-visible { outline: 1px solid #ff5100; outline-offset: 3px; border-radius: 50%; }
 #globe-brand .gb-info:focus-visible .gb-info-default { opacity: 0; }
 #globe-brand .gb-info:focus-visible .gb-info-hover { opacity: 1; }
-body.panel-open #globe-brand { display: none; }
+
 @media (max-width: 860px) {
   #globe-brand .gb-logo { display: none; }
   body.globe-search-open #globe-brand { display: none; }
