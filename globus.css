@@ -995,9 +995,12 @@ body::-webkit-scrollbar,
 #globe-search .gs-count strong { font-size: 40px; font-weight: 600; line-height: 40px; }
 #globe-search .gs-count span { font-size: 14px; line-height: 16px; }
 
-/* Make the original Webflow tooltip surface fill each search result. */
+/* Preserve the original horizontal tooltip composition at full list width. */
 #globe-search .gs-tooltip-surface {
   display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
@@ -1008,4 +1011,12 @@ body::-webkit-scrollbar,
     margin-left: max(6px, env(safe-area-inset-left, 0px));
     margin-right: calc(max(4px, env(safe-area-inset-right, 0px)) + 39px);
   }
+}
+
+#globe-search .gs-source-avatar { flex-shrink: 0 !important; }
+#globe-search .gs-source-text {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
 }
