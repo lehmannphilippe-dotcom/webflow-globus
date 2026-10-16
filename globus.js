@@ -2178,6 +2178,20 @@ function renderFamilyCards(speciesList = []) {
   let searchEntries = [];
   let searchReady = false;
   let searchOpeningResult = false;
+  // Original Figma logo and information component; panel action follows later.
+  if (!document.getElementById('globe-brand')) {
+    const brand = document.createElement('div');
+    brand.id = 'globe-brand';
+    brand.innerHTML = `
+      <span class="gb-logo" role="img" aria-label="The Silent Globe"></span>
+      <button type="button" class="gb-info" aria-label="Informationen zu The Silent Globe">
+        <span class="gb-info-default" aria-hidden="true"></span>
+        <span class="gb-info-hover" aria-hidden="true"></span>
+      </button>`;
+    brand.addEventListener('click', (event) => event.stopPropagation());
+    document.body.appendChild(brand);
+  }
+
   const searchRoot = document.createElement('section');
   searchRoot.id = 'globe-search';
   searchRoot.setAttribute('aria-label', 'Suche');
