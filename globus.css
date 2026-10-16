@@ -894,7 +894,7 @@ body.panel-open:has(#family-panel.is-open) #species-panel { pointer-events: none
 
 :root {--gs-search-icon: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiB2aWV3Qm94PSIwIDAgMzIgMzIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJzZWFyY2hfMjRkcF9FM0UzRTNfRklMTDBfd2dodDQwMF9HUkFEMF9vcHN6MjQgMSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik0yNi4xMzMzIDI4TDE3LjczMzMgMTkuNkMxNy4wNjY3IDIwLjEzMzMgMTYuMyAyMC41NTU2IDE1LjQzMzMgMjAuODY2N0MxNC41NjY3IDIxLjE3NzggMTMuNjQ0NCAyMS4zMzMzIDEyLjY2NjcgMjEuMzMzM0MxMC4yNDQ0IDIxLjMzMzMgOC4xOTQ0NCAyMC40OTQ0IDYuNTE2NjcgMTguODE2N0M0LjgzODg5IDE3LjEzODkgNCAxNS4wODg5IDQgMTIuNjY2N0M0IDEwLjI0NDQgNC44Mzg4OSA4LjE5NDQ0IDYuNTE2NjcgNi41MTY2N0M4LjE5NDQ0IDQuODM4ODkgMTAuMjQ0NCA0IDEyLjY2NjcgNEMxNS4wODg5IDQgMTcuMTM4OSA0LjgzODg5IDE4LjgxNjcgNi41MTY2N0MyMC40OTQ0IDguMTk0NDQgMjEuMzMzMyAxMC4yNDQ0IDIxLjMzMzMgMTIuNjY2N0MyMS4zMzMzIDEzLjY0NDQgMjEuMTc3OCAxNC41NjY3IDIwLjg2NjcgMTUuNDMzM0MyMC41NTU2IDE2LjMgMjAuMTMzMyAxNy4wNjY3IDE5LjYgMTcuNzMzM0wyOCAyNi4xMzMzTDI2LjEzMzMgMjhaTTEyLjY2NjcgMTguNjY2N0MxNC4zMzMzIDE4LjY2NjcgMTUuNzUgMTguMDgzMyAxNi45MTY3IDE2LjkxNjdDMTguMDgzMyAxNS43NSAxOC42NjY3IDE0LjMzMzMgMTguNjY2NyAxMi42NjY3QzE4LjY2NjcgMTEgMTguMDgzMyA5LjU4MzMzIDE2LjkxNjcgOC40MTY2N0MxNS43NSA3LjI1IDE0LjMzMzMgNi42NjY2NyAxMi42NjY3IDYuNjY2NjdDMTEgNi42NjY2NyA5LjU4MzMzIDcuMjUgOC40MTY2NyA4LjQxNjY3QzcuMjUgOS41ODMzMyA2LjY2NjY3IDExIDYuNjY2NjcgMTIuNjY2N0M2LjY2NjY3IDE0LjMzMzMgNy4yNSAxNS43NSA4LjQxNjY3IDE2LjkxNjdDOS41ODMzMyAxOC4wODMzIDExIDE4LjY2NjcgMTIuNjY2NyAxOC42NjY3WiIgZmlsbD0iI0ZGNTEwMCIvPgo8L2c+Cjwvc3ZnPgo="); --gs-close-icon: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJjbGVhciIgY2xpcC1wYXRoPSJ1cmwoI2NsaXAwXzBfMTEpIj4KPGcgaWQ9IlZlY3RvciI+CjwvZz4KPHBhdGggaWQ9IlZlY3Rvcl8yIiBkPSJNMTkgNi40MUwxNy41OSA1TDEyIDEwLjU5TDYuNDEgNUw1IDYuNDFMMTAuNTkgMTJMNSAxNy41OUw2LjQxIDE5TDEyIDEzLjQxTDE3LjU5IDE5TDE5IDE3LjU5TDEzLjQxIDEyTDE5IDYuNDFaIiBmaWxsPSIjRkMzQTFEIi8+CjwvZz4KPGRlZnM+CjxjbGlwUGF0aCBpZD0iY2xpcDBfMF8xMSI+CjxyZWN0IHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgZmlsbD0id2hpdGUiLz4KPC9jbGlwUGF0aD4KPC9kZWZzPgo8L3N2Zz4K");}
 /* Search — based on Figma, 393px mobile / 389px desktop. */
-#globe-search { position: fixed; top: 12px; right: 12px; width: 389px; max-width: calc(100vw - 24px); z-index: 100; font-family: Inter, 'Rubik Variable', Rubik, sans-serif; }
+#globe-search { position: fixed; top: 12px; right: 12px; width: 409px; max-width: calc(100vw - 24px); z-index: 100; font-family: Inter, 'Rubik Variable', Rubik, sans-serif; }
 #globe-search, #globe-search * { box-sizing: border-box; }
 #globe-search [hidden] { display: none !important; }
 #globe-search .gs-launch { display: none; }
@@ -994,3 +994,18 @@ body::-webkit-scrollbar,
 }
 #globe-search .gs-count strong { font-size: 40px; font-weight: 600; line-height: 40px; }
 #globe-search .gs-count span { font-size: 14px; line-height: 16px; }
+
+/* Make the original Webflow tooltip surface fill each search result. */
+#globe-search .gs-tooltip-surface {
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+/* Align mobile result edges with the search input, leaving room for its X. */
+@media (max-width: 860px) {
+  #globe-search .gs-results {
+    margin-left: max(6px, env(safe-area-inset-left, 0px));
+    margin-right: calc(max(4px, env(safe-area-inset-right, 0px)) + 39px);
+  }
+}
