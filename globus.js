@@ -2326,11 +2326,16 @@ function renderFamilyCards(speciesList = []) {
     if (avatar && type === 'species') {
       U.setWFImage(avatar, item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG);
       if (avatar.tagName === 'IMG') { avatar.alt = ''; avatar.loading = 'lazy'; }
+      avatar.style.setProperty('flex-shrink', '0');
     } else if (avatar) {
       // Replace only the avatar; retain its Webflow classes and its parent.
       const count = document.createElement('div');
       count.className = avatar.className;
       count.classList.add('gs-count');
+      ['margin', 'padding', 'border', 'border-radius', 'align-self'].forEach((property) => {
+        const value = avatar.style.getPropertyValue(property);
+        if (value) count.style.setProperty(property, value);
+      });
       const avatarStyle = getComputedStyle(DOM.tipImg || avatar);
       if (parseFloat(avatarStyle.width) > 0 && avatarStyle.width.endsWith('px')) {
         count.style.width = avatarStyle.width;
