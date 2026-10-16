@@ -2270,6 +2270,8 @@ function renderFamilyCards(speciesList = []) {
     });
     card.removeAttribute('aria-hidden');
     card.classList.add('gs-card');
+    const tooltipSurface = card.querySelector('.tooltip-card');
+    if (tooltipSurface) tooltipSurface.classList.add('gs-tooltip-surface');
     card.setAttribute('role', 'button');
     card.tabIndex = 0;
     card.setAttribute('aria-label', `${type === 'species' ? 'Art' : type === 'genus' ? 'Gattung' : 'Familie'}: ${item.name?.de || item.name?.lat || item.id}`);
