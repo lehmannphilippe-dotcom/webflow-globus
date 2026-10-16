@@ -1758,6 +1758,7 @@
     const genusDate = genusItem?.extinction_date || "";
 
     U.setText(DOM.genusFamily, genusItem?.family || "");
+    if (DOM.genusFamily) DOM.genusFamily.dataset.familyKey = genusItem?.family_key || "";
     U.setText(DOM.genusNameLat, genusItem?.name?.lat || "");
     U.setText(DOM.genusNameDe, genusItem?.name?.de || "");
     U.setText(DOM.genusExtDate, genusDate);
@@ -1987,7 +1988,10 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function openFamilyPanelFromSpecies(speciesItem) {
-    const familyKey = speciesItem?.taxonomy?.family_key || "";
+    openFamilyPanelByKey(speciesItem?.taxonomy?.family_key || "");
+  }
+
+  function openFamilyPanelByKey(familyKey) {
     if (!familyKey) return;
 
     const familyItem = FAMILY_BY_KEY.get(familyKey);
@@ -2030,7 +2034,7 @@ function renderFamilyCards(speciesList = []) {
   DOM.genusFamily?.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (activeSpeciesItem) openFamilyPanelFromSpecies(activeSpeciesItem);
+    openFamilyPanelByKey(DOM.genusFamily?.dataset.familyKey || activeSpeciesItem?.taxonomy?.family_key || "");
   });
 
   DOM.familyStickyGenusLink?.addEventListener("click", (e) => {
@@ -2168,6 +2172,218 @@ function renderFamilyCards(speciesList = []) {
   );
 
   // =========================================================
+  // SEARCH — Figma desktop dropdown / mobile full-screen
+  // Reuses the existing Webflow species tooltip as the result template.
+  // =========================================================
+  let searchEntries = [];
+  let searchReady = false;
+  let searchOpeningResult = false;
+  const searchRoot = document.createElement('section');
+  searchRoot.id = 'globe-search';
+  searchRoot.setAttribute('aria-label', 'Suche');
+  searchRoot.innerHTML = `
+    <button type="button" class="gs-launch" aria-label="Suche öffnen" aria-expanded="false" aria-controls="gs-surface"><span class="gs-icon" aria-hidden="true"></span></button>
+    <div id="gs-surface" class="gs-surface">
+      <div class="gs-header">
+        <label class="gs-field"><span class="gs-icon" aria-hidden="true"></span><input id="gs-input" type="search" aria-label="Suche nach Art, Gattung oder Familie" placeholder="Suche nach Art, Gattung oder Familie" autocomplete="off" spellcheck="false" enterkeyhint="search" aria-controls="gs-results" /></label>
+        <button type="button" class="gs-close" aria-label="Suche schliessen und zum Globus zurückkehren"><span aria-hidden="true"></span></button>
+      </div>
+      <div id="gs-results" class="gs-results" aria-label="Suchergebnisse" hidden></div>
+      <span class="gs-sr" role="status" aria-live="polite"></span>
+    </div>`;
+  document.body.appendChild(searchRoot);
+  const searchInput = searchRoot.querySelector('input');
+  const searchResults = searchRoot.querySelector('.gs-results');
+  const searchStatus = searchRoot.querySelector('[role="status"]');
+  const searchLaunch = searchRoot.querySelector('.gs-launch');
+  const searchMedia = matchMedia('(max-width: 860px)');
+  const searchNormalize = (value) => (value || '').toString().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/ß/g, 'ss')
+    .replace(/[ʻ’']/g, '').trim();
+
+  function setSearchOpen(open, focus = false) {
+    searchRoot.classList.toggle('is-open', open);
+    document.body.classList.toggle('globe-search-open', open);
+    searchLaunch.setAttribute('aria-expanded', String(open));
+    if (open) {
+      hideTooltip();
+      renderSearchResults();
+      if (focus) searchInput.focus();
+    } else {
+      searchResults.hidden = true;
+      searchInput.blur();
+    }
+  }
+
+  function buildSearchIndex() {
+    const grouped = (key) => {
+      const map = new Map();
+      ALL.forEach((item) => {
+        const id = item.taxonomy[key];
+        if (!id) return;
+        if (!map.has(id)) map.set(id, []);
+        map.get(id).push(item);
+      });
+      return map;
+    };
+    const genera = grouped('genus_key');
+    const families = grouped('family_key');
+    const entry = (type, item, species = []) => ({
+      type, item, species,
+      names: [item.name?.de, item.name?.lat, item.name?.en].filter(Boolean).map(searchNormalize)
+    });
+    searchEntries = [
+      ...ALL.map((item) => entry('species', item)),
+      ...Array.from(GENUS_BY_KEY.values(), (item) => entry('genus', item, genera.get(item.id) || [])),
+      ...Array.from(FAMILY_BY_KEY.values(), (item) => entry('family', item, families.get(item.id) || []))
+    ];
+    searchReady = true;
+    if (searchRoot.classList.contains('is-open')) renderSearchResults();
+  }
+
+  function makeSearchResult(entry) {
+    const { item, type, species } = entry;
+    const card = DOM.tip ? DOM.tip.cloneNode(true) : document.createElement('div');
+    const avatar = card.querySelector('[id="tooltip-avatar"]') || document.createElement('img');
+    const title = card.querySelector('[id="tooltip-name-de"]') || document.createElement('div');
+    const latin = card.querySelector('[id="tooltip-name-lat"]') || document.createElement('div');
+    const date = card.querySelector('[id="tooltip-lastseen"]') || document.createElement('div');
+    [card, ...card.querySelectorAll('*')].forEach((el) => {
+      el.removeAttribute('id');
+      el.removeAttribute('style');
+      el.removeAttribute('aria-hidden');
+      el.removeAttribute('data-w-id');
+    });
+    card.classList.add('gs-card');
+    card.setAttribute('role', 'button');
+    card.tabIndex = 0;
+    card.setAttribute('aria-label', `${type === 'species' ? 'Art' : type === 'genus' ? 'Gattung' : 'Familie'}: ${item.name?.de || item.name?.lat || item.id}`);
+    title.classList.add('gs-name');
+    latin.classList.add('gs-latin');
+    date.classList.add('gs-date');
+    U.setText(title, item.name?.de || item.name?.lat || item.id);
+    U.setText(latin, item.name?.lat || '');
+    const dateValue = item.extinction_date || item.last_seen || '';
+    U.setText(date, dateValue ? `† ${dateValue}` : '');
+    date.hidden = !dateValue;
+    const text = document.createElement('div');
+    text.className = 'gs-card-text';
+    text.append(title, latin, date);
+    let visual = avatar;
+    if (type === 'species') {
+      avatar.classList.add('gs-avatar');
+      U.setWFImage(avatar, item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG);
+      if (avatar.tagName === 'IMG') { avatar.alt = ''; avatar.loading = 'lazy'; }
+    } else {
+      visual = document.createElement('div');
+      visual.className = 'gs-count';
+      const number = document.createElement('strong');
+      number.textContent = species.length;
+      const label = document.createElement('span');
+      label.textContent = species.length === 1 ? 'Art' : 'Arten';
+      visual.append(number, label);
+    }
+    card.replaceChildren(visual, text);
+    card.addEventListener('click', () => openSearchResult(entry));
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openSearchResult(entry);
+      }
+    });
+    return card;
+  }
+
+  function renderSearchResults() {
+    const query = searchNormalize(searchInput.value);
+    searchResults.replaceChildren();
+    searchResults.scrollTop = 0;
+    if (!query) { searchResults.hidden = true; searchStatus.textContent = ''; return; }
+    searchResults.hidden = false;
+    if (!searchReady) {
+      searchResults.textContent = 'Suchdaten werden geladen …';
+      return;
+    }
+    const words = query.split(/\s+/);
+    const matches = searchEntries.filter((entry) => words.every((word) => entry.names.some((name) => name.includes(word))));
+    const rank = (entry) => entry.names.includes(query) ? 0 : entry.names.some((name) => name.startsWith(query)) ? 1 : 2;
+    matches.sort((a, b) => rank(a) - rank(b) || compareText(a.item.name?.de || a.item.name?.lat, b.item.name?.de || b.item.name?.lat));
+    const fragment = document.createDocumentFragment();
+    matches.forEach((entry) => fragment.appendChild(makeSearchResult(entry)));
+    searchResults.appendChild(fragment);
+    if (!matches.length) {
+      const empty = document.createElement('p');
+      empty.className = 'gs-message';
+      empty.textContent = 'Keine Treffer gefunden.';
+      searchResults.appendChild(empty);
+    }
+    searchStatus.textContent = `${matches.length} Treffer`;
+  }
+
+  async function openSearchResult(entry) {
+    if (searchOpeningResult) return;
+    searchOpeningResult = true;
+    setSearchOpen(false);
+    try {
+      if (entry.type === 'species') {
+        setShiftFactorFromClick((viewer.scene.canvas?.clientWidth || innerWidth) / 2);
+        await openSpeciesFromCard(entry.item);
+      } else {
+        await restoreDefaultState();
+        closeSecondaryPanels();
+        closeAIImageModal();
+        activeSpeciesItem = null;
+        updateAIImageInfoButton(null);
+        resetAllPanelScrollPositions();
+        if (entry.type === 'genus') {
+          fillGenusPanel(entry.item, entry.species);
+          renderGenusCards(entry.species);
+          finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
+        } else {
+          fillFamilyPanel(entry.item, entry.species);
+          renderFamilyCards(entry.species);
+          finalizeSecondaryPanel(DOM.familyPanel, DOM.familyCards);
+        }
+      }
+    } catch (error) {
+      console.warn('Suchtreffer konnte nicht vollständig geöffnet werden:', error);
+    } finally { searchOpeningResult = false; }
+  }
+
+  searchLaunch.addEventListener('click', () => setSearchOpen(true, true));
+  searchRoot.querySelector('.gs-close').addEventListener('click', () => {
+    setSearchOpen(false);
+    if (searchMedia.matches) searchLaunch.focus();
+  });
+  searchInput.addEventListener('focus', () => setSearchOpen(true));
+  searchInput.addEventListener('input', () => { setSearchOpen(true); });
+  searchRoot.addEventListener('keydown', (event) => {
+    const cards = Array.from(searchResults.querySelectorAll('.gs-card'));
+    const index = cards.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' && cards.length) {
+      event.preventDefault(); cards[Math.min(index + 1, cards.length - 1)].focus();
+    } else if (event.key === 'ArrowUp' && cards.length) {
+      event.preventDefault(); (index <= 0 ? searchInput : cards[index - 1]).focus();
+    } else if (event.key === 'Tab' && searchMedia.matches && searchRoot.classList.contains('is-open')) {
+      const controls = [searchInput, searchRoot.querySelector('.gs-close'), ...cards];
+      if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls[controls.length - 1].focus(); }
+      else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) { event.preventDefault(); controls[0].focus(); }
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && searchRoot.classList.contains('is-open')) {
+      event.preventDefault(); event.stopImmediatePropagation(); setSearchOpen(false);
+      if (searchMedia.matches) searchLaunch.focus();
+    }
+  }, true);
+  document.addEventListener('pointerdown', (event) => {
+    if (!searchMedia.matches && !searchRoot.contains(event.target)) setSearchOpen(false);
+  });
+  // Search events must not reach the globe / existing panel overlay.
+  searchRoot.addEventListener('click', (event) => event.stopPropagation());
+  searchMedia.addEventListener('change', () => setSearchOpen(false));
+
+  // =========================================================
   // START
   // =========================================================
   loadSpecies()
@@ -2182,6 +2398,7 @@ function renderFamilyCards(speciesList = []) {
       );
 
       addAllPoints();
+      buildSearchIndex();
     })
     .catch(console.warn);
 })();
