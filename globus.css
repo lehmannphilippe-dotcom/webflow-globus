@@ -1277,10 +1277,10 @@ body.panel-open #globe-view-switch { display: none; }
   align-items: center;
   gap: inherit;
   width: 100%;
-  animation: gi-heading-enter 400ms ease-out both;
+  animation: gi-heading-enter 1200ms ease-out both;
 }
 @keyframes gi-heading-enter {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(80px); }
   to { opacity: 1; transform: translateY(0); }
 }
 #globe-intro .gi-description {
