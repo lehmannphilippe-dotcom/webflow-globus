@@ -187,10 +187,18 @@
   let introPointsReady = false;
   let introViewerReady = false;
   let introFrame = 0;
-  let introStarted = false;
+  let introMaskReady = false;
+  let introLandStage = null;
+  let introGlobeVisible = false;
+  let revealIntroPoints = () => {};
+  const INTRO_START = 500;
   const INTRO_TARGET = 1470;
-  const INTRO_DURATION = 3000;
+  const INTRO_DURATION = 5000;
+  const INTRO_GLOBE_DELAY = 800;
+  const introStartedAt = performance.now();
+  const introReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   document.documentElement.classList.add('globe-intro-active');
+  DOM.globeHost.classList.add('gi-globe-stage');
   const intro = document.createElement('div');
   intro.id = 'globe-intro';
   intro.setAttribute('role', 'dialog');
@@ -200,17 +208,23 @@
   intro.innerHTML = `
     <div class="gi-content">
       <span class="gi-logo" role="img" aria-label="The Silent Globe"></span>
-      <div class="gi-count" aria-hidden="true">0</div>
+      <div class="gi-count" aria-hidden="true">500</div>
       <span class="gi-sr">1470 Vogelarten hat der Mensch bis heute ausgerottet.</span>
-      <p class="gi-description" aria-hidden="true">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
-      <p class="gi-regions">Verfügbare Regionen erforschen</p>
-      <button type="button" class="gi-hawaii">Hawaii</button>
+      <div class="gi-details" aria-hidden="true" inert>
+        <p class="gi-description">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
+        <p class="gi-regions">Verfügbare Regionen erforschen</p>
+        <button type="button" class="gi-hawaii">Hawaii</button>
+      </div>
     </div>`;
   document.body.appendChild(intro);
   const introCount = intro.querySelector('.gi-count');
   const introHawaii = intro.querySelector('.gi-hawaii');
-  const introReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const introDetails = intro.querySelector('.gi-details');
   intro.focus({ preventScroll: true });
+
+  function introProgress(now = performance.now()) {
+    return introReducedMotion ? 1 : Math.min(1, Math.max(0, (now - introStartedAt) / INTRO_DURATION));
+  }
 
   function dismissIntro() {
     if (!introActive) return;
@@ -228,44 +242,63 @@
     setTimeout(() => intro.remove(), introReducedMotion ? 0 : 400);
   }
 
+  // Runs before any awaited texture/data request: the counter never waits for Cesium.
+  function tickIntro(now) {
+    if (!introActive) return;
+    const progress = introProgress(now);
+    introCount.textContent = String(Math.floor(INTRO_START + progress * (INTRO_TARGET - INTRO_START)));
+    revealIntroPoints(progress);
+    if (progress >= .8) {
+      intro.classList.add('is-details-visible');
+      introDetails.removeAttribute('aria-hidden');
+      introDetails.removeAttribute('inert');
+    }
+    if (progress < 1) introFrame = requestAnimationFrame(tickIntro);
+  }
+  introFrame = requestAnimationFrame(tickIntro);
+
+  // Data arriving late catches up to the existing timeline without restarting it.
   function beginIntro() {
     introPointsReady = true;
     if (!introActive) { setAllPointsVisible(true); return; }
-    if (introStarted) return;
-    introStarted = true;
-    // Interleave geographically unrelated entries so points fill the globe.
     const orderedPoints = Array.from({ length: points.length }, (_, i) => points.get(i));
     for (let i = orderedPoints.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [orderedPoints[i], orderedPoints[j]] = [orderedPoints[j], orderedPoints[i]];
     }
     let revealed = 0;
-    const reveal = (fraction) => {
+    revealIntroPoints = (fraction) => {
       const target = Math.floor(fraction * orderedPoints.length);
       while (revealed < target) orderedPoints[revealed++].show = true;
       viewer.scene.requestRender?.();
     };
-    // Wait for a rendered globe frame before fading in the content.
-    const removeRenderListener = viewer.scene.postRender.addEventListener(() => {
-      removeRenderListener();
-      if (!introActive) return;
-      intro.classList.add('is-ready');
-      if (introReducedMotion) {
-        introCount.textContent = String(INTRO_TARGET);
-        reveal(1);
-        return;
+    revealIntroPoints(introProgress());
+  }
+
+  function watchIntroGlobe() {
+    let readyFrames = 0;
+    let lastFrame = performance.now();
+    const removeListener = viewer.scene.postRender.addEventListener(() => {
+      const now = performance.now();
+      const elapsed = Math.min(.05, Math.max(0, (now - lastFrame) / 1000));
+      lastFrame = now;
+      if (!introGlobeVisible) {
+        const ready = introMaskReady && (!introLandStage || introLandStage.ready) && viewer.scene.globe.tilesLoaded;
+        readyFrames = ready ? readyFrames + 1 : 0;
+        if (now - introStartedAt >= INTRO_GLOBE_DELAY && readyFrames >= 2) {
+          introGlobeVisible = true;
+          DOM.globeHost.classList.add('gi-globe-visible');
+          intro.classList.add('is-globe-visible');
+          setTimeout(() => DOM.globeHost.classList.remove('gi-globe-stage', 'gi-globe-visible'), introReducedMotion ? 0 : 1250);
+        }
       }
-      const started = performance.now();
-      const tick = (now) => {
-        if (!introActive) return;
-        const progress = Math.min(1, (now - started) / INTRO_DURATION);
-        introCount.textContent = String(Math.floor(progress * INTRO_TARGET));
-        reveal(progress);
-        if (progress < 1) introFrame = requestAnimationFrame(tick);
-      };
-      introFrame = requestAnimationFrame(tick);
+      if (introGlobeVisible && introActive && !introReducedMotion) {
+        // Half a degree per second; independent of the display's frame rate.
+        viewer.camera.rotate(Cesium.Cartesian3.UNIT_Z, Cesium.Math.toRadians(.5) * elapsed);
+        viewer.scene.requestRender?.();
+      }
+      if (introGlobeVisible && !introActive) removeListener();
     });
-    viewer.scene.requestRender?.();
   }
 
   intro.addEventListener('click', (event) => {
@@ -277,10 +310,14 @@
     if (event.key === 'Escape' || (event.key === 'Enter' && event.target !== introHawaii)) {
       event.preventDefault(); event.stopImmediatePropagation(); dismissIntro();
     } else if (event.key === 'Tab') {
-      event.preventDefault(); event.stopImmediatePropagation(); introHawaii.focus();
+      event.preventDefault(); event.stopImmediatePropagation();
+      (intro.classList.contains('is-details-visible') ? introHawaii : intro).focus();
     }
   }, true);
 
+
+  // Give the logo and 500 a first paint before constructing the WebGL viewer.
+  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
   const cs = getComputedStyle(DOM.globeHost);
   if (!cs.height || cs.height === "0px") DOM.globeHost.style.height = "100vh";
@@ -1181,8 +1218,10 @@
   scc.enableLook = false;
 
   viewer.camera.setView({
-    destination: Cesium.Cartesian3.fromDegrees(20, 15, 12_000_000)
+    destination: Cesium.Cartesian3.fromDegrees(20, 15, 15_000_000)
   });
+
+  watchIntroGlobe();
 
   const baseLayer = viewer.imageryLayers.get(0);
   if (baseLayer) Object.assign(baseLayer, CONFIG.STYLE);
@@ -1658,78 +1697,86 @@
     });
   }
 
-  try {
-    const maskTex = await loadAndDownscaleMaskToTexture(CONFIG.LAND_MASK_URL);
-
-    const landStage = new Cesium.PostProcessStage({
-      name: "land-grade",
-      uniforms: {
-        maskTex,
-        landContrast: CONFIG.LAND_GRADE.contrast,
-        landSaturation: CONFIG.LAND_GRADE.saturation,
-        landBlueBoost: CONFIG.LAND_GRADE.blueBoost,
-        landLift: CONFIG.LAND_GRADE.lift,
-        landRgCut: CONFIG.LAND_GRADE.rgCut,
-        strength: CONFIG.LAND_GRADE.strength
-      },
-      fragmentShader: `
-        uniform sampler2D colorTexture;
-        uniform sampler2D maskTex;
-
-        uniform float landContrast;
-        uniform float landSaturation;
-        uniform float landBlueBoost;
-        uniform float landLift;
-        uniform float landRgCut;
-        uniform float strength;
-
-        #if __VERSION__ == 300
-          in vec2 v_textureCoordinates;
-          out vec4 fragColor;
-          #define TEX(S,U) texture(S,U)
-          #define OUT fragColor
-        #else
-          varying vec2 v_textureCoordinates;
-          #define TEX(S,U) texture2D(S,U)
-          #define OUT gl_FragColor
-        #endif
-
-        vec3 applyContrast(vec3 c, float k){ return (c - 0.5) * k + 0.5; }
-        vec3 applySaturation(vec3 c, float s){
-          float l = dot(c, vec3(0.2126,0.7152,0.0722));
-          return mix(vec3(l), c, s);
-        }
-
-        void main(){
-          vec2 uv = v_textureCoordinates;
-
-          vec4 col = TEX(colorTexture, uv);
-          vec3 c = col.rgb;
-
-          float water = TEX(maskTex, uv).r;
-          float landMask = 1.0 - water;
-
-          float w = smoothstep(0.35, 0.65, landMask) * strength;
-
-          vec3 land = c;
-          land = applyContrast(land, landContrast);
-          land = applySaturation(land, landSaturation);
-
-          land.r = max(0.0, land.r - landRgCut);
-          land.g = max(0.0, land.g - landRgCut);
-          land.b = min(1.0, land.b + landBlueBoost);
-
-          land = clamp(land + landLift, 0.0, 1.0);
-
-          OUT = vec4(mix(c, land, w), col.a);
-        }
-      `
-    });
-
-    viewer.scene.postProcessStages.add(landStage);
-  } catch (e) {
-    console.warn("Land-grade stage failed, continuing without it:", e);
+  // Prepare the mask independently so the header and data do not wait for it.
+  async function prepareIntroMask() {
+    try {
+      const maskTex = await loadAndDownscaleMaskToTexture(CONFIG.LAND_MASK_URL);
+  
+      const landStage = new Cesium.PostProcessStage({
+        name: "land-grade",
+        uniforms: {
+          maskTex,
+          landContrast: CONFIG.LAND_GRADE.contrast,
+          landSaturation: CONFIG.LAND_GRADE.saturation,
+          landBlueBoost: CONFIG.LAND_GRADE.blueBoost,
+          landLift: CONFIG.LAND_GRADE.lift,
+          landRgCut: CONFIG.LAND_GRADE.rgCut,
+          strength: CONFIG.LAND_GRADE.strength
+        },
+        fragmentShader: `
+          uniform sampler2D colorTexture;
+          uniform sampler2D maskTex;
+  
+          uniform float landContrast;
+          uniform float landSaturation;
+          uniform float landBlueBoost;
+          uniform float landLift;
+          uniform float landRgCut;
+          uniform float strength;
+  
+          #if __VERSION__ == 300
+            in vec2 v_textureCoordinates;
+            out vec4 fragColor;
+            #define TEX(S,U) texture(S,U)
+            #define OUT fragColor
+          #else
+            varying vec2 v_textureCoordinates;
+            #define TEX(S,U) texture2D(S,U)
+            #define OUT gl_FragColor
+          #endif
+  
+          vec3 applyContrast(vec3 c, float k){ return (c - 0.5) * k + 0.5; }
+          vec3 applySaturation(vec3 c, float s){
+            float l = dot(c, vec3(0.2126,0.7152,0.0722));
+            return mix(vec3(l), c, s);
+          }
+  
+          void main(){
+            vec2 uv = v_textureCoordinates;
+  
+            vec4 col = TEX(colorTexture, uv);
+            vec3 c = col.rgb;
+  
+            float water = TEX(maskTex, uv).r;
+            float landMask = 1.0 - water;
+  
+            float w = smoothstep(0.35, 0.65, landMask) * strength;
+  
+            vec3 land = c;
+            land = applyContrast(land, landContrast);
+            land = applySaturation(land, landSaturation);
+  
+            land.r = max(0.0, land.r - landRgCut);
+            land.g = max(0.0, land.g - landRgCut);
+            land.b = min(1.0, land.b + landBlueBoost);
+  
+            land = clamp(land + landLift, 0.0, 1.0);
+  
+            OUT = vec4(mix(c, land, w), col.a);
+          }
+        `
+      });
+  
+      viewer.scene.postProcessStages.add(landStage);
+      introLandStage = landStage;
+    } catch (e) {
+      console.warn("Land-grade stage failed, continuing without it:", e);
+    }
+    introMaskReady = true;
+    viewer.scene.requestRender?.();
   }
+  prepareIntroMask();
+
 
   // =========================================================
   // TOOLTIP
@@ -2624,8 +2671,6 @@ function renderFamilyCards(speciesList = []) {
     })
     .catch((error) => {
       console.warn(error);
-      // Keep the intro dismissible if species data cannot be loaded.
-      intro.classList.add("is-ready");
-      introCount.textContent = String(INTRO_TARGET);
+      // The independent intro timeline stays usable even if species data fails.
     });
 })();
