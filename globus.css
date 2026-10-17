@@ -1253,9 +1253,9 @@ body.panel-open #globe-view-switch { display: none; }
   box-sizing: border-box;
   padding: 24px;
   overflow-y: auto;
-  background: rgba(18, 22, 65, .4);
+  background: #0a0c28;
   opacity: 1;
-  transition: opacity 400ms ease-out;
+  transition: opacity 400ms ease-out, background-color 1200ms ease-out;
   cursor: pointer;
 }
 #globe-intro .gi-content {
@@ -1269,10 +1269,29 @@ body.panel-open #globe-view-switch { display: none; }
   padding: 20px 0;
   text-align: center;
   filter: drop-shadow(0 0 60px #000);
-  opacity: 0;
-  transition: opacity 400ms ease-out;
+  opacity: 1;
 }
-#globe-intro.is-ready .gi-content { opacity: 1; }
+#globe-intro.is-globe-visible { background: rgba(18, 22, 65, .4); }
+#globe-intro .gi-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 800ms ease-out, visibility 0s 800ms;
+}
+#globe-intro.is-details-visible .gi-details {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+#globe.gi-globe-stage {
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 360ms ease-out, opacity 1200ms ease-out;
+}
+#globe.gi-globe-stage.gi-globe-visible { opacity: 1; pointer-events: auto; }
 #globe-intro.is-closing { opacity: 0; }
 #globe-intro .gi-logo {
   display: block;
@@ -1343,6 +1362,6 @@ html.globe-intro-active body { overflow: hidden; }
   #globe-intro .gi-count { font-size: 52px; min-height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #globe-intro, #globe-intro .gi-content,
+  #globe-intro, #globe-intro .gi-content, #globe-intro .gi-details, #globe.gi-globe-stage,
   #globe-brand, #globe-view-switch, #globe-search { transition: none; }
 }
