@@ -213,7 +213,7 @@
       </div>
       <span class="gi-sr">1470 Vogelarten hat der Mensch bis heute ausgerottet.</span>
       <p class="gi-description" aria-hidden="true">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
-      <div class="gi-details" aria-hidden="true" inert>
+      <div class="gi-details">
         <p class="gi-regions">Verfügbare Regionen erforschen</p>
         <button type="button" class="gi-hawaii">Hawaii</button>
       </div>
@@ -222,7 +222,6 @@
   const introCount = intro.querySelector('.gi-count');
   const introHawaii = intro.querySelector('.gi-hawaii');
   const introDetails = intro.querySelector('.gi-details');
-  const introDescription = intro.querySelector('.gi-description');
   intro.focus({ preventScroll: true });
 
   function introProgress(now = performance.now()) {
@@ -245,21 +244,13 @@
     setTimeout(() => intro.remove(), introReducedMotion ? 0 : 400);
   }
 
+  // Only the numeric counter uses JavaScript. CSS schedules all intro text reveals.
   // Runs before any awaited texture/data request: the counter never waits for Cesium.
   function tickIntro(now) {
     if (!introActive) return;
     const progress = introProgress(now);
     introCount.textContent = String(Math.floor(INTRO_START + progress * (INTRO_TARGET - INTRO_START)));
     revealIntroPoints(progress);
-    if (progress >= .4) {
-      intro.classList.add('is-description-visible');
-      introDescription.removeAttribute('aria-hidden');
-    }
-    if (progress >= .8) {
-      intro.classList.add('is-details-visible');
-      introDetails.removeAttribute('aria-hidden');
-      introDetails.removeAttribute('inert');
-    }
     if (progress < 1) introFrame = requestAnimationFrame(tickIntro);
   }
   introFrame = requestAnimationFrame(tickIntro);
@@ -318,7 +309,7 @@
       event.preventDefault(); event.stopImmediatePropagation(); dismissIntro();
     } else if (event.key === 'Tab') {
       event.preventDefault(); event.stopImmediatePropagation();
-      (intro.classList.contains('is-details-visible') ? introHawaii : intro).focus();
+      (getComputedStyle(introDetails).visibility === 'visible' ? introHawaii : intro).focus();
     }
   }, true);
 
