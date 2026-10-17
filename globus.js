@@ -251,7 +251,7 @@
     const progress = introProgress(now);
     introCount.textContent = String(Math.floor(INTRO_START + progress * (INTRO_TARGET - INTRO_START)));
     revealIntroPoints(progress);
-    if (progress >= .64) {
+    if (progress >= .4) {
       intro.classList.add('is-description-visible');
       introDescription.removeAttribute('aria-hidden');
     }
