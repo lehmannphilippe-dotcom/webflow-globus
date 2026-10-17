@@ -29,7 +29,7 @@
       "https://raw.githubusercontent.com/lehmannphilippe-dotcom/webflow-data/refs/heads/main/family.json",
 
     LAND_MASK_URL:
-      "https://cdn.prod.website-files.com/6950eb029163bef776e18cfd/6973b1021ea865f12ac7c9bf_world.watermask.21600x10800.png",
+      "https://cdn.prod.website-files.com/6a2856622c4f26c0e72a657b/6ad388d22b6b727fa6c79c29_world.watermask.4096x2048.png",
 
     POINT_COLOR: "#FF5100",
     POINT_SIZE: 8,
