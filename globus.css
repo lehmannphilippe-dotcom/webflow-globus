@@ -1271,6 +1271,28 @@ body.panel-open #globe-view-switch { display: none; }
   filter: drop-shadow(0 0 60px #000);
   opacity: 1;
 }
+#globe-intro .gi-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+  width: 100%;
+  animation: gi-heading-enter 400ms ease-out both;
+}
+@keyframes gi-heading-enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#globe-intro .gi-description {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 800ms ease-out, visibility 0s 800ms;
+}
+#globe-intro.is-description-visible .gi-description {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
 #globe-intro.is-globe-visible { background: rgba(18, 22, 65, .4); }
 #globe-intro .gi-details {
   display: flex;
@@ -1362,6 +1384,7 @@ html.globe-intro-active body { overflow: hidden; }
   #globe-intro .gi-count { font-size: 52px; min-height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #globe-intro, #globe-intro .gi-content, #globe-intro .gi-details, #globe.gi-globe-stage,
+  #globe-intro, #globe-intro .gi-content, #globe-intro .gi-description, #globe-intro .gi-details, #globe.gi-globe-stage,
   #globe-brand, #globe-view-switch, #globe-search { transition: none; }
+  #globe-intro .gi-heading { animation: none; }
 }
