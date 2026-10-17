@@ -180,6 +180,108 @@
 
   if (!DOM.globeHost) return;
 
+  // =========================================================
+  // INTRO — shown on every page load, never stored in the browser.
+  // =========================================================
+  let introActive = true;
+  let introPointsReady = false;
+  let introViewerReady = false;
+  let introFrame = 0;
+  let introStarted = false;
+  const INTRO_TARGET = 1470;
+  const INTRO_DURATION = 3000;
+  document.documentElement.classList.add('globe-intro-active');
+  const intro = document.createElement('div');
+  intro.id = 'globe-intro';
+  intro.setAttribute('role', 'dialog');
+  intro.setAttribute('aria-modal', 'true');
+  intro.setAttribute('aria-label', 'The Silent Globe – Einführung. Zum Überspringen ausserhalb des Hawaii-Buttons klicken oder Escape drücken.');
+  intro.tabIndex = -1;
+  intro.innerHTML = `
+    <div class="gi-content">
+      <span class="gi-logo" role="img" aria-label="The Silent Globe"></span>
+      <div class="gi-count" aria-hidden="true">0</div>
+      <span class="gi-sr">1470 Vogelarten hat der Mensch bis heute ausgerottet.</span>
+      <p class="gi-description" aria-hidden="true">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
+      <p class="gi-regions">Verfügbare Regionen erforschen</p>
+      <button type="button" class="gi-hawaii">Hawaii</button>
+    </div>`;
+  document.body.appendChild(intro);
+  const introCount = intro.querySelector('.gi-count');
+  const introHawaii = intro.querySelector('.gi-hawaii');
+  const introReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  intro.focus({ preventScroll: true });
+
+  function dismissIntro() {
+    if (!introActive) return;
+    introActive = false;
+    cancelAnimationFrame(introFrame);
+    introCount.textContent = String(INTRO_TARGET);
+    if (introPointsReady) setAllPointsVisible(true);
+    if (introViewerReady) viewer.scene.screenSpaceCameraController.enableInputs = true;
+    document.documentElement.classList.remove('globe-intro-active');
+    document.documentElement.classList.add('globe-intro-dismissed');
+    intro.classList.add('is-closing');
+    intro.setAttribute('aria-hidden', 'true');
+    intro.removeAttribute('aria-modal');
+    if (intro.contains(document.activeElement)) document.activeElement.blur();
+    setTimeout(() => intro.remove(), introReducedMotion ? 0 : 400);
+  }
+
+  function beginIntro() {
+    introPointsReady = true;
+    if (!introActive) { setAllPointsVisible(true); return; }
+    if (introStarted) return;
+    introStarted = true;
+    // Interleave geographically unrelated entries so points fill the globe.
+    const orderedPoints = Array.from({ length: points.length }, (_, i) => points.get(i));
+    for (let i = orderedPoints.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [orderedPoints[i], orderedPoints[j]] = [orderedPoints[j], orderedPoints[i]];
+    }
+    let revealed = 0;
+    const reveal = (fraction) => {
+      const target = Math.floor(fraction * orderedPoints.length);
+      while (revealed < target) orderedPoints[revealed++].show = true;
+      viewer.scene.requestRender?.();
+    };
+    // Wait for a rendered globe frame before fading in the content.
+    const removeRenderListener = viewer.scene.postRender.addEventListener(() => {
+      removeRenderListener();
+      if (!introActive) return;
+      intro.classList.add('is-ready');
+      if (introReducedMotion) {
+        introCount.textContent = String(INTRO_TARGET);
+        reveal(1);
+        return;
+      }
+      const started = performance.now();
+      const tick = (now) => {
+        if (!introActive) return;
+        const progress = Math.min(1, (now - started) / INTRO_DURATION);
+        introCount.textContent = String(Math.floor(progress * INTRO_TARGET));
+        reveal(progress);
+        if (progress < 1) introFrame = requestAnimationFrame(tick);
+      };
+      introFrame = requestAnimationFrame(tick);
+    });
+    viewer.scene.requestRender?.();
+  }
+
+  intro.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!event.target.closest('.gi-hawaii')) dismissIntro();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (!introActive) return;
+    if (event.key === 'Escape' || (event.key === 'Enter' && event.target !== introHawaii)) {
+      event.preventDefault(); event.stopImmediatePropagation(); dismissIntro();
+    } else if (event.key === 'Tab') {
+      event.preventDefault(); event.stopImmediatePropagation(); introHawaii.focus();
+    }
+  }, true);
+
+
   const cs = getComputedStyle(DOM.globeHost);
   if (!cs.height || cs.height === "0px") DOM.globeHost.style.height = "100vh";
   DOM.globeHost.style.width = "100%";
@@ -1071,6 +1173,8 @@
   }
 
   const scc = viewer.scene.screenSpaceCameraController;
+  introViewerReady = true;
+  scc.enableInputs = !introActive;
   scc.minimumZoomDistance = Math.max(5, CONFIG.ZOOM_IN_STOP_HEIGHT_M);
   scc.maximumZoomDistance = CONFIG.ZOOM_OUT_STOP_HEIGHT_M;
   scc.enableTilt = false;
@@ -2112,7 +2216,7 @@ function renderFamilyCards(speciesList = []) {
         position: Cesium.Cartesian3.fromDegrees(d.location.lng, d.location.lat),
         pixelSize: CONFIG.POINT_SIZE,
         color: Cesium.Color.fromCssColorString(CONFIG.POINT_COLOR),
-        show: true
+        show: !introActive
       });
       p.id = d;
     }
@@ -2127,7 +2231,7 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     (m) => {
-      if (document.body.classList.contains("panel-open")) return;
+      if (introActive || document.body.classList.contains("panel-open")) return;
       if (inDetailMode) {
         hideTooltip();
         return;
@@ -2141,6 +2245,7 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     async (c) => {
+      if (introActive) return;
       const picked = viewer.scene.pick(c.position);
       const item = picked?.primitive?.id;
 
@@ -2507,14 +2612,20 @@ function renderFamilyCards(speciesList = []) {
       ALL = data;
 
       GENUS_BY_KEY = new Map(
-        (await loadJsonArray(CONFIG.GENUS_URL)).map((item) => [item.id, item])
+        (await loadJsonArray(CONFIG.GENUS_URL).catch((error) => { console.warn(error); return []; })).map((item) => [item.id, item])
       );
       FAMILY_BY_KEY = new Map(
-        (await loadJsonArray(CONFIG.FAMILY_URL)).map((item) => [item.id, item])
+        (await loadJsonArray(CONFIG.FAMILY_URL).catch((error) => { console.warn(error); return []; })).map((item) => [item.id, item])
       );
 
       addAllPoints();
       buildSearchIndex();
+      beginIntro();
     })
-    .catch(console.warn);
+    .catch((error) => {
+      console.warn(error);
+      // Keep the intro dismissible if species data cannot be loaded.
+      intro.classList.add("is-ready");
+      introCount.textContent = String(INTRO_TARGET);
+    });
 })();
