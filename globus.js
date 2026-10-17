@@ -207,11 +207,13 @@
   intro.tabIndex = -1;
   intro.innerHTML = `
     <div class="gi-content">
-      <span class="gi-logo" role="img" aria-label="The Silent Globe"></span>
-      <div class="gi-count" aria-hidden="true">500</div>
+      <div class="gi-heading">
+        <span class="gi-logo" role="img" aria-label="The Silent Globe"></span>
+        <div class="gi-count" aria-hidden="true">500</div>
+      </div>
       <span class="gi-sr">1470 Vogelarten hat der Mensch bis heute ausgerottet.</span>
+      <p class="gi-description" aria-hidden="true">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
       <div class="gi-details" aria-hidden="true" inert>
-        <p class="gi-description">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
         <p class="gi-regions">Verfügbare Regionen erforschen</p>
         <button type="button" class="gi-hawaii">Hawaii</button>
       </div>
@@ -220,6 +222,7 @@
   const introCount = intro.querySelector('.gi-count');
   const introHawaii = intro.querySelector('.gi-hawaii');
   const introDetails = intro.querySelector('.gi-details');
+  const introDescription = intro.querySelector('.gi-description');
   intro.focus({ preventScroll: true });
 
   function introProgress(now = performance.now()) {
@@ -248,6 +251,10 @@
     const progress = introProgress(now);
     introCount.textContent = String(Math.floor(INTRO_START + progress * (INTRO_TARGET - INTRO_START)));
     revealIntroPoints(progress);
+    if (progress >= .64) {
+      intro.classList.add('is-description-visible');
+      introDescription.removeAttribute('aria-hidden');
+    }
     if (progress >= .8) {
       intro.classList.add('is-details-visible');
       introDetails.removeAttribute('aria-hidden');
@@ -293,8 +300,8 @@
         }
       }
       if (introGlobeVisible && introActive && !introReducedMotion) {
-        // Half a degree per second; independent of the display's frame rate.
-        viewer.camera.rotate(Cesium.Cartesian3.UNIT_Z, Cesium.Math.toRadians(.5) * elapsed);
+        // 0.8 degrees per second; independent of the display's frame rate.
+        viewer.camera.rotate(Cesium.Cartesian3.UNIT_Z, Cesium.Math.toRadians(.8) * elapsed);
         viewer.scene.requestRender?.();
       }
       if (introGlobeVisible && !introActive) removeListener();
