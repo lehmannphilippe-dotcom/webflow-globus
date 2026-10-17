@@ -2288,7 +2288,7 @@ function renderFamilyCards(speciesList = []) {
     const brand = document.createElement('div');
     brand.id = 'globe-brand';
     brand.innerHTML = `
-      <span class="gb-logo" role="img" aria-label="The Silent Globe"></span>
+      <span class="gb-logo" role="img" aria-label="The Silent Globe Hawaii"></span>
       <button type="button" class="gb-info" aria-label="Informationen zu The Silent Globe">
         <span class="gb-info-default" aria-hidden="true"></span>
         <span class="gb-info-hover" aria-hidden="true"></span>
