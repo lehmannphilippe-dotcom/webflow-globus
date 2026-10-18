@@ -1348,54 +1348,17 @@
       updateFamilyGenusStickyTracks(DOM.familyCards);
       updateStickyFamilyGenusLink();
       if (document.body.classList.contains("panel-open")) {
-        requestPanelShiftUpdate();
+        applySpeciesProjection();
       }
     },
     { passive: true }
   );
 
   // =========================================================
-  // PANEL SHIFT
+  // PANEL VIEWPORT: keep the canvas fixed; only the camera projection moves.
   // =========================================================
-  function getCameraHeightM() {
-    try {
-      return viewer.camera.positionCartographic?.height ?? Infinity;
-    } catch {
-      return Infinity;
-    }
-  }
-
-  function shouldApplyPanelShift() {
-    return activeView === "globe" && (speciesReturnView !== null || getCameraHeightM() <= CONFIG.PANEL_SHIFT_MAX_HEIGHT_M);
-  }
-
-  let lastShiftFactor = 1;
-  let shiftRAF = 0;
-
-  function setShiftFactorFromClick(clickX) {
-    const canvasW = viewer.scene.canvas?.clientWidth || innerWidth || 1;
-    lastShiftFactor = U.clamp(clickX / canvasW, 0, 1);
-  }
-
   function updatePanelShiftVar() {
-    const wantShift = shouldApplyPanelShift();
-    const panelW = DOM.panelEl ? DOM.panelEl.offsetWidth : 0;
-    const effectiveW = wantShift ? panelW * lastShiftFactor : 0;
-    document.body.style.setProperty(
-      "--panel-shift",
-      `${Math.round(effectiveW)}px`
-    );
-  }
-
-  function requestPanelShiftUpdate() {
-    if (!document.body.classList.contains("panel-open")) return;
-    if (shiftRAF) return;
-
-    shiftRAF = requestAnimationFrame(() => {
-      shiftRAF = 0;
-      updatePanelShiftVar();
-      requestViewerResize();
-    });
+    document.body.style.setProperty('--panel-shift', '0px');
   }
 
   function setPanelOpen(open) {
@@ -1416,9 +1379,6 @@
     requestViewerResize();
   }
 
-  try {
-    viewer.camera.changed.addEventListener(() => requestPanelShiftUpdate());
-  } catch {}
 
   // =========================================================
   // RANGES
@@ -1564,7 +1524,35 @@
   let speciesReturnView = null;
   let speciesFlightToken = 0;
   let speciesResizeTimer = 0;
-  let speciesMotionTimer = 0;
+  let speciesProjectionRAF = 0;
+  let speciesProjectionRatio = 0;
+  const SPECIES_FLIGHT_SECONDS = 1.5;
+
+  function applySpeciesProjection() {
+    const frustum = viewer.camera.frustum;
+    if (!Number.isFinite(frustum.fovy)) return;
+    // xOffset is measured on the near plane, not in world metres.
+    frustum.xOffset = frustum.near * Math.tan(frustum.fovy / 2)
+      * frustum.aspectRatio * speciesProjectionRatio;
+  }
+
+  function animateSpeciesProjection(target, duration) {
+    cancelAnimationFrame(speciesProjectionRAF);
+    const from = speciesProjectionRatio;
+    const started = performance.now();
+    const tick = () => {
+      const fraction = duration ? Math.min(1, (performance.now() - started) / (duration * 1000)) : 1;
+      const eased = Cesium.EasingFunction.CUBIC_IN_OUT(fraction);
+      speciesProjectionRatio = from + (target - from) * eased;
+      applySpeciesProjection();
+      viewer.scene.requestRender?.();
+      speciesProjectionRAF = fraction < 1 ? requestAnimationFrame(tick) : 0;
+    };
+    tick();
+  }
+
+  // Recompute the near-plane offset after Cesium updates the canvas aspect ratio.
+  viewer.scene.preUpdate.addEventListener(applySpeciesProjection);
   const speciesDesktop = () => innerWidth > 860;
 
   function rememberSpeciesView() {
@@ -1572,13 +1560,14 @@
     viewer.camera.cancelFlight();
     if (!speciesReturnView) speciesReturnView = {
       destination: Cesium.Cartesian3.clone(viewer.camera.positionWC),
+      projectionRatio: speciesProjectionRatio,
       orientation: {
         direction: Cesium.Cartesian3.clone(viewer.camera.directionWC),
         up: Cesium.Cartesian3.clone(viewer.camera.upWC)
       }
     };
     hawaiiOverviewLocked = false;
-    lastShiftFactor = .5;
+
   }
 
   function speciesRangePositions() {
@@ -1596,7 +1585,7 @@
   }
 
   // Fit all vertices in a north-up tangent frame, using only the unobscured width.
-  // The canvas shifts by half the panel width, so its centre matches the free map.
+  // An off-centre camera projection places the target beside the panel without moving the canvas.
   function speciesDestination(positions, width, height, panelWidth, frustum) {
     const rectangle = Cesium.Rectangle.fromCartesianArray(positions);
     const centre = Cesium.Rectangle.center(rectangle);
@@ -1646,34 +1635,30 @@
     const canvas = viewer.scene.canvas;
     const destination = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
       DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
-    clearTimeout(speciesMotionTimer);
-    document.body.classList.add('species-camera-motion');
-    // Commit the resting transform before starting both movements in one frame.
-    void DOM.globeHost.offsetWidth;
+    const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS;
     if (openPanel) setPanelOpen(true);
-    updatePanelShiftVar();
+    animateSpeciesProjection((DOM.panelEl?.offsetWidth || 0) / Math.max(1, canvas.clientWidth), duration);
     viewer.camera.flyTo({ destination,
       orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
-      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3,
+      duration,
       easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
     });
   }
 
-  function restoreSpeciesView() {
+  function restoreSpeciesView(immediate = false) {
     ++speciesFlightToken;
     clearTimeout(speciesResizeTimer);
     const saved = speciesReturnView;
     speciesReturnView = null;
     if (!saved || activeView !== 'globe') return;
     viewer.camera.cancelFlight();
-    viewer.camera.flyTo({ ...saved,
-      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3,
+    const duration = immediate || matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS;
+    animateSpeciesProjection(saved.projectionRatio || 0, duration);
+    viewer.camera.flyTo({ destination: saved.destination, orientation: saved.orientation,
+      duration,
       easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
     });
-    clearTimeout(speciesMotionTimer);
-    speciesMotionTimer = setTimeout(() => {
-      if (!speciesReturnView) document.body.classList.remove('species-camera-motion');
-    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3050);
+
   }
 
   function scheduleSpeciesReframe() {
@@ -2184,7 +2169,7 @@ function renderFamilyCards(speciesList = []) {
     });
   }
 
-  async function closeAllPanels() {
+  async function closeAllPanels(immediateCameraReturn = false) {
     ++speciesFlightToken;
     viewer.camera.cancelFlight();
     closeSecondaryPanels();
@@ -2194,7 +2179,7 @@ function renderFamilyCards(speciesList = []) {
     resetAllPanelScrollPositions();
     await restoreDefaultState();
     setPanelOpen(false);
-    restoreSpeciesView();
+    restoreSpeciesView(immediateCameraReturn === true);
     if (activeView === 'cards' && overviewReturnFocus?.isConnected) {
       overviewReturnFocus.focus({ preventScroll: true });
       overviewReturnFocus = null;
@@ -2660,7 +2645,7 @@ function renderFamilyCards(speciesList = []) {
     if (activeView === next) { updateOverviewTabs(next); return; }
     setOverviewMenu(false);
     setSearchOpen(false);
-    await closeAllPanels();
+    await closeAllPanels(true);
     if (token !== overviewSwitchToken) return;
     if (next === 'cards') {
       hawaiiFlightPending = false;
@@ -2982,7 +2967,6 @@ function renderFamilyCards(speciesList = []) {
     setSearchOpen(false);
     try {
       if (entry.type === 'species') {
-        setShiftFactorFromClick((viewer.scene.canvas?.clientWidth || innerWidth) / 2);
         await openSpeciesFromCard(entry.item);
       } else {
         await restoreDefaultState();
