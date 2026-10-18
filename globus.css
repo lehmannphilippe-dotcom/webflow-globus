@@ -1356,8 +1356,13 @@ body.panel-open #globe-view-switch { display: none; }
   color: #121442;
   font: 700 20px/24px Inter, sans-serif;
   cursor: pointer;
+  transition: background-color 300ms ease-out, color 300ms ease-out;
 }
-#globe-intro .gi-hawaii:focus-visible { outline: 2px solid #7493c6; outline-offset: 3px; }
+#globe-intro .gi-hawaii-label { opacity: .8; }
+@media (hover: hover) {
+  #globe-intro .gi-hawaii:hover { background: #121740; color: #ff5100; }
+}
+#globe-intro .gi-hawaii:focus-visible { background: #121740; color: #ff5100; outline: 2px solid #7493c6; outline-offset: 3px; }
 #globe-intro .gi-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 #globe-brand, #globe-view-switch, #globe-search {
   transition: opacity 400ms ease-out, translate 400ms ease-out;
@@ -1383,7 +1388,7 @@ html.globe-intro-active body { overflow: hidden; }
   #globe-intro .gi-count { font-size: 52px; min-height: 52px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #globe-intro, #globe-intro .gi-content, #globe-intro .gi-description, #globe-intro .gi-details, #globe.gi-globe-stage,
+  #globe-intro, #globe-intro .gi-content, #globe-intro .gi-hawaii, #globe-intro .gi-description, #globe-intro .gi-details, #globe.gi-globe-stage,
   #globe-brand, #globe-view-switch, #globe-search { transition: none; }
   #globe-intro .gi-heading { animation: none; }
   #globe-intro .gi-description, #globe-intro .gi-details {
