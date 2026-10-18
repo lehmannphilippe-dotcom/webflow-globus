@@ -1553,6 +1553,12 @@
     for (const ds of activeRangeDS) for (const entity of ds.entities.values) {
       if (entity.polygon?.hierarchy) visit(entity.polygon.hierarchy.getValue(time));
     }
+    // All three spot layers share this collection. Include them alongside every
+    // polygon layer, including species with spots but no polygon geometry.
+    for (let i = 0; i < rangePoints.length; i++) {
+      const point = rangePoints.get(i);
+      if (point.show && point.position) result.push(point.position);
+    }
     return result;
   }
 
