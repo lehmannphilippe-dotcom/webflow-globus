@@ -2510,6 +2510,8 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function overviewGroups(items, mode) {
+    // Scope only the card overview; globe and global search keep the full data.
+    items = items.filter((item) => overviewRegions(item).length > 0);
     const groups = new Map();
     const add = (key, label, order, item) => {
       if (!groups.has(key)) groups.set(key, { key, label, order, items: [] });
@@ -2530,10 +2532,8 @@ function renderFamilyCards(speciesList = []) {
     }
     const result = [...groups.values()].sort((a, b) => typeof a.order === 'number' ? a.order - b.order : overviewCollator.compare(a.order, b.order));
     for (const group of result) group.items.sort((a, b) => {
-      if (mode === 'region') {
-        const spDifference = Number(/\bsp\./i.test(a.name?.lat || '')) - Number(/\bsp\./i.test(b.name?.lat || ''));
-        if (spDifference) return spDifference;
-      }
+      const spDifference = Number(/\bsp\./i.test(a.name?.lat || '')) - Number(/\bsp\./i.test(b.name?.lat || ''));
+      if (spDifference) return spDifference;
       if (mode === 'year') {
         const difference = overviewYearBucket(a).year - overviewYearBucket(b).year;
         if (Number.isFinite(difference) && difference !== 0) return difference;
@@ -2545,7 +2545,7 @@ function renderFamilyCards(speciesList = []) {
 
   const overview = document.createElement('section');
   overview.id = 'species-browser';
-  overview.setAttribute('aria-label', 'Kartenübersicht aller Arten');
+  overview.setAttribute('aria-label', 'Kartenübersicht der Arten aus Hawaii');
   overview.setAttribute('aria-hidden', 'true');
   overview.setAttribute('inert', '');
   overview.innerHTML = `
@@ -2709,8 +2709,8 @@ function renderFamilyCards(speciesList = []) {
       if (overviewImageSources.has(image)) overviewImageObserver?.observe(image);
     });
     if (resetScroll) overview.scrollTop = 0;
-    const count = overviewSort === 'region' ? ALL.filter((item) => overviewRegions(item).length).length : ALL.length;
-    overviewStatus.textContent = `${count} Arten/Formen${overviewSort === 'region' ? ' aus Hawaii' : ''}, sortiert nach ${overviewSorts.find(([value]) => value === overviewSort)[1]}.`;
+    const count = ALL.filter((item) => overviewRegions(item).length).length;
+    overviewStatus.textContent = `${count} Arten/Formen aus Hawaii, sortiert nach ${overviewSorts.find(([value]) => value === overviewSort)[1]}.`;
     overviewStatus.classList.add('is-sr-only');
     overviewContent.setAttribute('aria-busy', 'false');
     requestAnimationFrame(() => {
