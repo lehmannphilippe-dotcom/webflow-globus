@@ -2530,6 +2530,10 @@ function renderFamilyCards(speciesList = []) {
     }
     const result = [...groups.values()].sort((a, b) => typeof a.order === 'number' ? a.order - b.order : overviewCollator.compare(a.order, b.order));
     for (const group of result) group.items.sort((a, b) => {
+      if (mode === 'region') {
+        const spDifference = Number(/\bsp\./i.test(a.name?.lat || '')) - Number(/\bsp\./i.test(b.name?.lat || ''));
+        if (spDifference) return spDifference;
+      }
       if (mode === 'year') {
         const difference = overviewYearBucket(a).year - overviewYearBucket(b).year;
         if (Number.isFinite(difference) && difference !== 0) return difference;
