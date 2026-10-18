@@ -1464,7 +1464,7 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
 #species-browser .gbv-content { opacity: 1; transform: translateY(0); transition: opacity 125ms ease-out, transform 125ms ease-out; }
 #species-browser .gbv-content.is-changing { opacity: 0; transform: translateY(6px); }
 #species-browser .gbv-group { margin: 0 0 13px; scroll-margin-top: 78px; }
-#species-browser .gbv-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 0 0 13px; color: #fff; font: 700 50px/1 Inter, sans-serif; overflow-wrap: anywhere; }
+#species-browser .gbv-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 0 0 13px; color: #fff; font: 800 30px/30px "Globe Intro Poppins", Poppins, sans-serif; overflow-wrap: anywhere; }
 #species-browser .gbv-count { color: inherit; font: 400 18px/24px Inter, sans-serif; }
 #species-browser .gbv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: stretch; }
 #species-browser .gbv-card { display: flex !important; flex-direction: column !important; position: relative; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; align-self: stretch !important; box-sizing: border-box !important; flex: none !important; cursor: pointer; }
@@ -1483,8 +1483,8 @@ body.globe-cards-view #species-browser .gbv-card {
 #species-browser.has-alphabet { --gbv-inset-right: 44px; padding-right: 44px; }
 #species-browser .gbv-alphabet { position: fixed; right: max(4px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; width: 24px; }
 #species-browser .gbv-alphabet[hidden] { display: none; }
-#species-browser .gbv-alphabet button { padding: 0; width: 24px; height: clamp(13px, 2.5dvh, 22px); border: 0; background: transparent; color: #7da1da; font: 700 clamp(10px, 1.7dvh, 18px)/1 Inter, sans-serif; cursor: pointer; }
-#species-browser .gbv-alphabet button[aria-current="true"] { color: white; }
+#species-browser .gbv-alphabet button { padding: 0; width: 24px; height: clamp(13px, 2.5dvh, 22px); border: 0; background: transparent; color: #7da1da; font: 800 clamp(10px, 2.5dvh, 20px)/1 "Globe Intro Poppins", Poppins, sans-serif; text-decoration: none; cursor: pointer; }
+#species-browser .gbv-alphabet button[aria-current="true"] { color: white; text-decoration: underline; text-underline-offset: .12em; }
 #species-browser .gbv-alphabet button:disabled { opacity: .3; cursor: default; }
 #species-browser .gbv-alphabet button:focus-visible { outline: 1px solid #ff5100; border-radius: 3px; }
 #species-browser .gbv-status { color: #7da1da; font: 400 16px/24px Inter, sans-serif; }
@@ -1493,7 +1493,7 @@ body.globe-cards-view #species-browser .gbv-card {
 @media (max-width: 860px) {
   #species-browser { --gbv-inset-left: 12px; --gbv-inset-right: 12px; --gbv-header-depth: 88px; padding: 0 12px max(40px, env(safe-area-inset-bottom, 0px)); }
   #species-browser .gbv-toolbar { margin-top: 88px; }
-  #species-browser .gbv-heading { font-size: 34px; line-height: 1.1; gap: 6px; }
+  #species-browser .gbv-heading { font-size: 30px; line-height: 30px; gap: 6px; }
   #species-browser .gbv-count { font-size: 14px; line-height: 20px; }
   #species-browser .gbv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #species-browser.has-alphabet { --gbv-inset-right: 34px; padding-right: 34px; }
