@@ -203,7 +203,7 @@
   let hawaiiFlightToken = 0;
   let hawaiiResizeTimer = 0;
   let revealIntroPoints = () => {};
-  const INTRO_START = 500;
+  const INTRO_START = 1400;
   const INTRO_TARGET = 1470;
   const INTRO_DURATION = 5000;
   const INTRO_GLOBE_DELAY = 800;
@@ -221,7 +221,7 @@
     <div class="gi-content">
       <div class="gi-heading">
         <span class="gi-logo" role="img" aria-label="The Silent Globe"></span>
-        <div class="gi-count" aria-hidden="true">500</div>
+        <div class="gi-count" aria-hidden="true">${INTRO_START}</div>
       </div>
       <span class="gi-sr">1470 Vogelarten hat der Mensch bis heute ausgerottet.</span>
       <p class="gi-description" aria-hidden="true">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
@@ -398,7 +398,7 @@
   }, true);
 
 
-  // Give the logo and 500 a first paint before constructing the WebGL viewer.
+  // Give the logo and initial count a first paint before constructing the WebGL viewer.
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
   const cs = getComputedStyle(DOM.globeHost);
