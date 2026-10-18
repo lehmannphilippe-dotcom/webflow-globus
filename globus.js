@@ -1348,7 +1348,7 @@
       updateFamilyGenusStickyTracks(DOM.familyCards);
       updateStickyFamilyGenusLink();
       if (document.body.classList.contains("panel-open")) {
-        applySpeciesProjection();
+        // Desktop panel framing is recalculated by scheduleSpeciesReframe().
       }
     },
     { passive: true }
@@ -1524,35 +1524,8 @@
   let speciesReturnView = null;
   let speciesFlightToken = 0;
   let speciesResizeTimer = 0;
-  let speciesProjectionRAF = 0;
-  let speciesProjectionRatio = 0;
   const SPECIES_FLIGHT_SECONDS = 1.5;
 
-  function applySpeciesProjection() {
-    const frustum = viewer.camera.frustum;
-    if (!Number.isFinite(frustum.fovy)) return;
-    // xOffset is measured on the near plane, not in world metres.
-    frustum.xOffset = frustum.near * Math.tan(frustum.fovy / 2)
-      * frustum.aspectRatio * speciesProjectionRatio;
-  }
-
-  function animateSpeciesProjection(target, duration) {
-    cancelAnimationFrame(speciesProjectionRAF);
-    const from = speciesProjectionRatio;
-    const started = performance.now();
-    const tick = () => {
-      const fraction = duration ? Math.min(1, (performance.now() - started) / (duration * 1000)) : 1;
-      const eased = Cesium.EasingFunction.CUBIC_IN_OUT(fraction);
-      speciesProjectionRatio = from + (target - from) * eased;
-      applySpeciesProjection();
-      viewer.scene.requestRender?.();
-      speciesProjectionRAF = fraction < 1 ? requestAnimationFrame(tick) : 0;
-    };
-    tick();
-  }
-
-  // Recompute the near-plane offset after Cesium updates the canvas aspect ratio.
-  viewer.scene.preUpdate.addEventListener(applySpeciesProjection);
   const speciesDesktop = () => innerWidth > 860;
 
   function rememberSpeciesView() {
@@ -1560,7 +1533,6 @@
     viewer.camera.cancelFlight();
     if (!speciesReturnView) speciesReturnView = {
       destination: Cesium.Cartesian3.clone(viewer.camera.positionWC),
-      projectionRatio: speciesProjectionRatio,
       orientation: {
         direction: Cesium.Cartesian3.clone(viewer.camera.directionWC),
         up: Cesium.Cartesian3.clone(viewer.camera.upWC)
@@ -1585,7 +1557,8 @@
   }
 
   // Fit all vertices in a north-up tangent frame, using only the unobscured width.
-  // An off-centre camera projection places the target beside the panel without moving the canvas.
+  // Move the camera east in the target tangent frame; keep a symmetric frustum.
+  // Looking parallel to the target normal places it beside the panel without clipping render passes.
   function speciesDestination(positions, width, height, panelWidth, frustum) {
     const rectangle = Cesium.Rectangle.fromCartesianArray(positions);
     const centre = Cesium.Rectangle.center(rectangle);
@@ -1613,7 +1586,13 @@
       const cosine = Cesium.Cartesian3.dot(normal, up);
       if (cosine > .01) altitude = Math.max(altitude, 6378137 * (1 / cosine - 1) * 1.02);
     }
-    return Cesium.Cartesian3.fromRadians(centre.longitude, centre.latitude, altitude);
+    const eastOffset = altitude * tanX * panelWidth / Math.max(1, width);
+    const destination = Cesium.Matrix4.multiplyByPoint(frame,
+      new Cesium.Cartesian3(eastOffset, 0, altitude), new Cesium.Cartesian3());
+    const up = Cesium.Matrix4.multiplyByPointAsVector(frame, Cesium.Cartesian3.UNIT_Y, new Cesium.Cartesian3());
+    const direction = Cesium.Matrix4.multiplyByPointAsVector(frame,
+      new Cesium.Cartesian3(0, 0, -1), new Cesium.Cartesian3());
+    return { destination, orientation: { direction, up } };
   }
 
   async function focusSpecies(item, openPanel = false) {
@@ -1633,13 +1612,11 @@
     }
     if (!positions.length) { if (openPanel) setPanelOpen(true); return; }
     const canvas = viewer.scene.canvas;
-    const destination = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
+    const target = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
       DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
     const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS;
     if (openPanel) setPanelOpen(true);
-    animateSpeciesProjection((DOM.panelEl?.offsetWidth || 0) / Math.max(1, canvas.clientWidth), duration);
-    viewer.camera.flyTo({ destination,
-      orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
+    viewer.camera.flyTo({ ...target,
       duration,
       easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
     });
@@ -1653,7 +1630,6 @@
     if (!saved || activeView !== 'globe') return;
     viewer.camera.cancelFlight();
     const duration = immediate || matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS;
-    animateSpeciesProjection(saved.projectionRatio || 0, duration);
     viewer.camera.flyTo({ destination: saved.destination, orientation: saved.orientation,
       duration,
       easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
