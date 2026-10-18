@@ -84,12 +84,11 @@ body.panel-open canvas {
 --------------------------- */
 
 #globe {
-  transition: transform 360ms cubic-bezier(.4, 0, .2, 1), opacity 220ms ease;
-  will-change: transform;
+  transition: opacity 220ms ease;
 }
 
 body.panel-open #globe {
-  transform: translate3d(calc(var(--panel-shift, 0px) * -1), 0, 0);
+  transform: none;
 }
 
 /* ---------------------------
@@ -1398,13 +1397,8 @@ html.globe-intro-active body { overflow: hidden; }
   }
 }
 
-/* Species flights: translate the map while Cesium zooms/rotates (3 s). */
-body.species-camera-motion #globe {
-  transition: transform 3000ms cubic-bezier(.65, 0, .35, 1), opacity 220ms ease;
-}
-@media (prefers-reduced-motion: reduce) {
-  body.species-camera-motion #globe { transition: none; }
-}
+/* Camera framing never translates the canvas, including during panel return. */
+body.panel-open #globe { transform: none; }
 
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
