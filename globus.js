@@ -190,6 +190,8 @@
   // =========================================================
   // INTRO — shown on every page load, never stored in the browser.
   // =========================================================
+  let activeView = "globe";
+  let overviewCameraSnapshot = null;
   let introActive = true;
   let introPointsReady = false;
   let introViewerReady = false;
@@ -1363,7 +1365,7 @@
   }
 
   function shouldApplyPanelShift() {
-    return getCameraHeightM() <= CONFIG.PANEL_SHIFT_MAX_HEIGHT_M;
+    return activeView === "globe" && getCameraHeightM() <= CONFIG.PANEL_SHIFT_MAX_HEIGHT_M;
   }
 
   let lastShiftFactor = 1;
@@ -1396,6 +1398,7 @@
   }
 
   function setPanelOpen(open) {
+    document.getElementById('species-browser')?.toggleAttribute('inert', open || activeView !== 'cards');
     if (open) {
       updatePanelShiftVar();
       document.body.classList.add("panel-open");
@@ -1406,7 +1409,7 @@
       document.body.classList.remove("panel-open");
       document.body.style.setProperty("--panel-shift", "0px");
       if (viewer?.scene?.screenSpaceCameraController) {
-        viewer.scene.screenSpaceCameraController.enableInputs = !introActive && !hawaiiFlightActive && !hawaiiFlightPending;
+        viewer.scene.screenSpaceCameraController.enableInputs = activeView === "globe" && !introActive && !hawaiiFlightActive && !hawaiiFlightPending;
       }
     }
     requestViewerResize();
@@ -2018,7 +2021,7 @@
     }
   }
 
-  function buildSpeciesCard(item) {
+  function buildSpeciesCard(item, options = {}) {
     const template = DOM.speciesCardTemplate;
     if (!template || !item) return null;
 
@@ -2035,7 +2038,7 @@
     );
     const habitatEl = card.querySelector(".card-habitat");
 
-    U.setWFImage(imgEl, item?.images?.panel || CONFIG.DEFAULT_PANEL_IMG);
+    if (!options.deferImage) U.setWFImage(imgEl, item?.images?.panel || CONFIG.DEFAULT_PANEL_IMG);
     U.setText(nameDeEl, item?.name?.de || "");
     U.setText(nameLatEl, item?.name?.lat || "");
 
@@ -2201,6 +2204,11 @@ function renderFamilyCards(speciesList = []) {
     resetPanelScroll(DOM.genusPanel);
     resetPanelScroll(DOM.familyPanel);
     resetCardRailScroll();
+    if (activeView === 'cards') {
+      overviewReturnFocus = document.activeElement && overview.contains(document.activeElement) ? document.activeElement : null;
+      setPanelOpen(true);
+      return;
+    }
     setAllPointsVisible(false);
     setPanelOpen(true);
 
@@ -2257,6 +2265,10 @@ function renderFamilyCards(speciesList = []) {
     resetAllPanelScrollPositions();
     await restoreDefaultState();
     setPanelOpen(false);
+    if (activeView === 'cards' && overviewReturnFocus?.isConnected) {
+      overviewReturnFocus.focus({ preventScroll: true });
+      overviewReturnFocus = null;
+    }
   }
 
   DOM.panelFamilyLink?.addEventListener("click", (e) => {
@@ -2367,7 +2379,7 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     (m) => {
-      if (introActive || hawaiiFlightActive || hawaiiFlightPending || document.body.classList.contains("panel-open")) return;
+      if (activeView !== 'globe' || introActive || hawaiiFlightActive || hawaiiFlightPending || document.body.classList.contains("panel-open")) return;
       if (inDetailMode) {
         hideTooltip();
         return;
@@ -2381,7 +2393,7 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     async (c) => {
-      if (introActive || hawaiiFlightActive || hawaiiFlightPending) return;
+      if (activeView !== 'globe' || introActive || hawaiiFlightActive || hawaiiFlightPending) return;
       const picked = viewer.scene.pick(c.position);
       const item = picked?.primitive?.id;
 
@@ -2433,7 +2445,7 @@ function renderFamilyCards(speciesList = []) {
     document.body.appendChild(brand);
   }
 
-  // View switcher: visual placeholder; globe remains selected.
+  // Switch between the existing globe and the species-card overview.
   if (!document.getElementById('globe-view-switch')) {
     const viewSwitch = document.createElement('div');
     viewSwitch.id = 'globe-view-switch';
@@ -2445,6 +2457,374 @@ function renderFamilyCards(speciesList = []) {
     viewSwitch.addEventListener('click', (event) => event.stopPropagation());
     document.body.appendChild(viewSwitch);
   }
+
+  // =========================================================
+  // SPECIES OVERVIEW — original Webflow cards, grouped locally.
+  // =========================================================
+  const overviewCollator = new Intl.Collator('de', { sensitivity: 'base', numeric: true, ignorePunctuation: true });
+  const overviewSorts = [
+    ['year', 'Aussterbejahr'], ['de', 'Name (DE)'], ['lat', 'Name (Lat)'], ['region', 'Region']
+  ];
+  const overviewNormalize = (value) => String(value || '').normalize('NFD')
+    .replace(/[\u0300-\u036fʻ’']/g, '').replace(/ß/g, 'ss').toLowerCase().trim();
+  const overviewName = (item, language = 'de') => item.name?.[language] || item.name?.de || item.name?.lat || item.id || 'Ohne Namen';
+
+  function overviewDateRange(item) {
+    const text = String(item.extinction_date || item.last_seen || '').trim();
+    if (/wiederentdeckt/i.test(text)) return { special: 'rediscovered', text };
+    if (!text || !/\d/.test(text)) return { special: 'unknown', text };
+    if (/oder\s+später/i.test(text)) return { special: 'uncertain', text };
+    const centuries = text.match(/(\d{1,2})\s*\.\s*(?:oder\s+(\d{1,2})\s*\.|\/\s*(\d{1,2})\s*\.)?\s*Jh(?:r)?(?:dt|d)?\.?/i);
+    if (centuries) {
+      const first = Number(centuries[1]);
+      const last = Number(centuries[2] || centuries[3] || centuries[1]);
+      return { from: (first - 1) * 100, to: last * 100 - 1, text };
+    }
+    const years = (text.match(/\d{3,4}/g) || []).map(Number);
+    if (!years.length) return { special: 'unknown', text };
+    const from = Math.min(...years);
+    const to = Math.max(...years) + (/\d{3,4}er[\s-]*Jahre/i.test(text) ? 9 : 0);
+    return { from, to, text };
+  }
+
+  function overviewYearBucket(item) {
+    const range = overviewDateRange(item);
+    const specialLabels = { unknown: 'Ohne Datierung', uncertain: 'Zeitraum unklar', rediscovered: 'Wiederentdeckt' };
+    const special = (key) => ({ key, label: specialLabels[key], order: { uncertain: 9000, unknown: 9001, rediscovered: 9002 }[key], year: Infinity });
+    if (range.special) return special(range.special);
+    // Before 1400 is one group; exact 1400 starts the following century group.
+    const bucket = (year) => year < 1400 ? 0 : Math.floor(year / 100) * 100;
+    const start = bucket(range.from);
+    if (start !== bucket(range.to)) return special('uncertain');
+    return { key: String(start), label: start === 0 ? '1000–1400' : String(start), order: start, year: range.from };
+  }
+
+  function overviewRegions(item) {
+    const habitat = overviewNormalize(item.habitat);
+    const islands = habitat.replace(/\([^)]*\)/g, '').split(/[,;/]|\s+und\s+/).map((part) => part.trim());
+    const labels = { hawaii: 'Hawaii (Big Island)', kauai: 'Kauai', lanai: 'Lanai', laysan: 'Laysan', maui: 'Maui', molokai: 'Molokai', oahu: 'Oahu', niihau: 'Niihau', kahoolawe: 'Kahoolawe' };
+    // A bare "Hawaii" describes the archipelago, not necessarily Big Island.
+    if (habitat === 'hawaii') return ['Hawaii (ohne Inselangabe)'];
+    const names = [...new Set(islands.map((name) => labels[name]).filter(Boolean))];
+    return names.length ? names : /\bhawaii\b/.test(habitat) ? ['Hawaii (ohne Inselangabe)'] : [];
+  }
+
+  function overviewGroups(items, mode) {
+    const groups = new Map();
+    const add = (key, label, order, item) => {
+      if (!groups.has(key)) groups.set(key, { key, label, order, items: [] });
+      if (item) groups.get(key).items.push(item);
+    };
+    if (mode === 'year') [0, 1400, 1500, 1600, 1700, 1800, 1900, 2000].forEach((year) => add(String(year), year ? String(year) : '1000–1400', year));
+    for (const item of items) {
+      if (mode === 'year') {
+        const bucket = overviewYearBucket(item);
+        add(bucket.key, bucket.label, bucket.order, item);
+      } else if (mode === 'region') {
+        overviewRegions(item).forEach((name) => add(name, name, name, item));
+      } else {
+        const initial = overviewNormalize(overviewName(item, mode)).replace(/^[^a-z]+/, '').charAt(0).toUpperCase();
+        const letter = /^[A-Z]$/.test(initial) ? initial : '#';
+        add(letter, letter, letter === '#' ? 'ZZZ' : letter, item);
+      }
+    }
+    const result = [...groups.values()].sort((a, b) => typeof a.order === 'number' ? a.order - b.order : overviewCollator.compare(a.order, b.order));
+    for (const group of result) group.items.sort((a, b) => {
+      if (mode === 'year') {
+        const difference = overviewYearBucket(a).year - overviewYearBucket(b).year;
+        if (Number.isFinite(difference) && difference !== 0) return difference;
+      }
+      return overviewCollator.compare(overviewName(a, mode === 'lat' ? 'lat' : 'de'), overviewName(b, mode === 'lat' ? 'lat' : 'de'));
+    });
+    return result;
+  }
+
+  const overview = document.createElement('section');
+  overview.id = 'species-browser';
+  overview.setAttribute('aria-label', 'Kartenübersicht aller Arten');
+  overview.setAttribute('aria-hidden', 'true');
+  overview.setAttribute('inert', '');
+  overview.innerHTML = `
+    <div class="gbv-toolbar">
+      <span id="gbv-sort-caption" class="gbv-caption">Sortieren nach:</span>
+      <div class="gbv-select">
+        <button type="button" id="gbv-sort" class="gbv-sort" aria-haspopup="listbox" aria-expanded="false" aria-controls="gbv-options" aria-labelledby="gbv-sort-caption gbv-sort-value"><span id="gbv-sort-value">Aussterbejahr</span><span class="gbv-chevron" aria-hidden="true"></span></button>
+        <div id="gbv-options" class="gbv-options" role="listbox" aria-label="Sortierung" inert>
+          ${overviewSorts.map(([value, label]) => `<button type="button" role="option" data-sort="${value}" aria-selected="${value === 'year'}" tabindex="-1">${label}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="gbv-content" aria-busy="false"></div>
+    <nav class="gbv-alphabet" aria-label="Alphabetische Schnellnavigation" hidden></nav>
+    <p class="gbv-status" role="status" aria-live="polite">Arten werden geladen …</p>`;
+  document.body.appendChild(overview);
+  const overviewContent = overview.querySelector('.gbv-content');
+  const overviewStatus = overview.querySelector('.gbv-status');
+  const overviewAlphabet = overview.querySelector('.gbv-alphabet');
+  const overviewSortButton = overview.querySelector('.gbv-sort');
+  const overviewOptions = overview.querySelector('.gbv-options');
+  const overviewOptionButtons = [...overviewOptions.querySelectorAll('[data-sort]')];
+  let overviewSort = 'year';
+  let overviewDataReady = false;
+  let overviewRenderedSort = null;
+  let overviewRenderToken = 0;
+  let overviewSwitchToken = 0;
+  let overviewGroupsOnScreen = [];
+  let overviewReturnFocus = null;
+  let overviewScrollFrame = 0;
+  let overviewMenuOpen = false;
+  let overviewImageObserver = null;
+  const overviewImageSources = new WeakMap();
+  const overviewReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const overviewWait = (ms) => new Promise((resolve) => setTimeout(resolve, overviewReducedMotion() ? 0 : ms));
+  if ('IntersectionObserver' in window) {
+    overviewImageObserver = new IntersectionObserver((entries) => {
+      for (const entry of entries) if (entry.isIntersecting) {
+        const url = overviewImageSources.get(entry.target);
+        if (url) U.setWFImage(entry.target, url);
+        overviewImageSources.delete(entry.target);
+        overviewImageObserver.unobserve(entry.target);
+      }
+    }, { root: overview, rootMargin: '500px 0px' });
+  }
+
+  function setOverviewMenu(open, focusOption = false) {
+    overviewMenuOpen = open;
+    overviewOptions.toggleAttribute('inert', !open);
+    overviewOptions.classList.toggle('is-open', open);
+    overviewSortButton.setAttribute('aria-expanded', String(open));
+    if (open && focusOption) overviewOptionButtons.find((button) => button.dataset.sort === overviewSort)?.focus();
+  }
+
+  function makeOverviewCard(item, styles) {
+    const card = buildSpeciesCard(item, { deferImage: true });
+    if (!card) return null;
+    const elements = [card, ...card.querySelectorAll('*')];
+    elements.forEach((element, index) => {
+      (styles[index] || []).forEach(([property, value]) => {
+        if (index === 0 && property === 'display') return;
+        element.style.setProperty(property, value);
+      });
+      element.removeAttribute('id');
+      element.removeAttribute('data-w-id');
+      element.removeAttribute('aria-labelledby');
+      element.removeAttribute('aria-describedby');
+    });
+    card.classList.add('gbv-card');
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `${overviewName(item, overviewSort === 'lat' ? 'lat' : 'de')} – Art öffnen`);
+    card.tabIndex = 0;
+    card.addEventListener('keydown', (event) => {
+      if (event.target !== card || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation(); card.click();
+    });
+    U.setText(card.querySelector('.card-name-de'), overviewName(item));
+    if (overviewSort === 'lat') {
+      U.setText(card.querySelector('.card-name-de'), overviewName(item, 'lat'));
+      U.setText(card.querySelector('.card-name-lat'), item.name?.de || '');
+    }
+    const image = card.querySelector('.card-image');
+    const url = item.images?.panel || CONFIG.DEFAULT_PANEL_IMG;
+    if (image) {
+      image.removeAttribute('srcset'); image.removeAttribute('sizes');
+      if (image.tagName === 'IMG') {
+        image.addEventListener('error', () => {
+          if (CONFIG.DEFAULT_PANEL_IMG && image.getAttribute('src') !== CONFIG.DEFAULT_PANEL_IMG) U.setWFImage(image, CONFIG.DEFAULT_PANEL_IMG);
+        }, { once: true });
+        image.removeAttribute('src');
+        image.loading = 'lazy'; image.decoding = 'async';
+        image.setAttribute('fetchpriority', 'low');
+        image.alt = overviewName(item);
+      } else image.style.backgroundImage = 'none';
+      if (overviewImageObserver) overviewImageSources.set(image, url);
+      else U.setWFImage(image, url);
+    }
+    return card;
+  }
+
+  async function renderOverview(animate = true, resetScroll = true) {
+    if (!overviewDataReady || activeView !== 'cards') return;
+    if (!DOM.speciesCardTemplate) {
+      overviewStatus.textContent = 'Die bestehende Webflow-Kartenvorlage #species-card-template fehlt.';
+      return;
+    }
+    const token = ++overviewRenderToken;
+    overviewContent.setAttribute('aria-busy', 'true');
+    if (animate && overviewRenderedSort !== null) { overviewContent.classList.add('is-changing'); await overviewWait(125); }
+    if (token !== overviewRenderToken || activeView !== 'cards') return;
+    overviewImageObserver?.disconnect();
+    const groups = overviewGroups(ALL, overviewSort);
+    const styles = snapshotSearchTooltipStyles(DOM.speciesCardTemplate);
+    const fragment = document.createDocumentFragment();
+    const sections = [];
+    let built = 0;
+    for (const [index, group] of groups.entries()) {
+      const section = document.createElement('section');
+      section.className = 'gbv-group';
+      section.id = `gbv-group-${index}`;
+      const heading = document.createElement('h2');
+      heading.className = 'gbv-heading';
+      heading.id = `${section.id}-heading`;
+      section.setAttribute('aria-labelledby', heading.id);
+      const title = document.createElement('span'); title.textContent = group.label;
+      const count = document.createElement('span'); count.className = 'gbv-count';
+      count.textContent = `${group.items.length} ${group.items.length === 1 ? 'Art/Form' : 'Arten/Formen'}`;
+      heading.append(title, count);
+      const grid = document.createElement('div'); grid.className = 'gbv-grid';
+      for (const item of group.items) {
+        const card = makeOverviewCard(item, styles);
+        if (card) grid.appendChild(card);
+        if (++built % 48 === 0) {
+          await new Promise(requestAnimationFrame);
+          if (token !== overviewRenderToken || activeView !== 'cards') return;
+        }
+      }
+      section.append(heading, grid); fragment.appendChild(section);
+      sections.push({ key: group.key, section });
+    }
+    if (token !== overviewRenderToken || activeView !== 'cards') return;
+    overviewContent.replaceChildren(fragment);
+    overviewGroupsOnScreen = sections;
+    overviewRenderedSort = overviewSort;
+    const alphabetical = ['de', 'lat'].includes(overviewSort);
+    overview.classList.toggle('has-alphabet', alphabetical);
+    overviewAlphabet.hidden = !alphabetical;
+    overviewAlphabet.replaceChildren();
+    if (alphabetical) {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      if (groups.some((group) => group.key === '#')) letters.push('#');
+      for (const letter of letters) {
+        const button = document.createElement('button'); button.type = 'button';
+        button.textContent = letter; button.dataset.letter = letter;
+        button.setAttribute('aria-label', `Zum Buchstaben ${letter}`);
+        button.disabled = !groups.some((group) => group.key === letter);
+        overviewAlphabet.appendChild(button);
+      }
+    }
+    overviewContent.querySelectorAll('.card-image').forEach((image) => {
+      if (overviewImageSources.has(image)) overviewImageObserver?.observe(image);
+    });
+    if (resetScroll) overview.scrollTop = 0;
+    const count = overviewSort === 'region' ? ALL.filter((item) => overviewRegions(item).length).length : ALL.length;
+    overviewStatus.textContent = `${count} Arten/Formen${overviewSort === 'region' ? ' aus Hawaii' : ''}, sortiert nach ${overviewSorts.find(([value]) => value === overviewSort)[1]}.`;
+    overviewStatus.classList.add('is-sr-only');
+    overviewContent.setAttribute('aria-busy', 'false');
+    requestAnimationFrame(() => {
+      if (token === overviewRenderToken) { overviewContent.classList.remove('is-changing'); updateOverviewAlphabet(); }
+    });
+  }
+
+  function updateOverviewAlphabet() {
+    overviewScrollFrame = 0;
+    if (overviewAlphabet.hidden) return;
+    let active = overviewGroupsOnScreen[0]?.key;
+    for (const group of overviewGroupsOnScreen) {
+      if (group.section.getBoundingClientRect().top <= overview.querySelector('.gbv-toolbar').getBoundingClientRect().bottom + 16) active = group.key;
+      else break;
+    }
+    if (overview.scrollTop > 0 && overview.scrollTop + overview.clientHeight >= overview.scrollHeight - 2) active = overviewGroupsOnScreen.at(-1)?.key;
+    overviewAlphabet.querySelectorAll('button').forEach((button) => {
+      if (button.dataset.letter === active) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
+    });
+  }
+
+  function updateOverviewTabs(next) {
+    document.querySelectorAll('#globe-view-switch .gv-tab').forEach((button) => {
+      const selected = button.classList.contains(next === 'cards' ? 'gv-grid' : 'gv-globe');
+      button.classList.toggle('is-active', selected); button.setAttribute('aria-pressed', String(selected));
+    });
+  }
+
+  async function setOverviewView(next) {
+    const token = ++overviewSwitchToken;
+    if (activeView === next) { updateOverviewTabs(next); return; }
+    setOverviewMenu(false);
+    setSearchOpen(false);
+    await closeAllPanels();
+    if (token !== overviewSwitchToken) return;
+    if (next === 'cards') {
+      hawaiiFlightPending = false;
+      viewer.camera.cancelFlight();
+      hawaiiOverviewLocked = false;
+      overviewCameraSnapshot = {
+        destination: Cesium.Cartesian3.clone(viewer.camera.positionWC),
+        direction: Cesium.Cartesian3.clone(viewer.camera.directionWC),
+        up: Cesium.Cartesian3.clone(viewer.camera.upWC)
+      };
+      activeView = 'cards';
+      updateOverviewTabs(next);
+      viewer.useDefaultRenderLoop = false;
+      viewer.scene.screenSpaceCameraController.enableInputs = false;
+      DOM.globeHost.setAttribute('aria-hidden', 'true');
+      DOM.globeHost.setAttribute('inert', '');
+      document.body.classList.add('globe-cards-view');
+      overview.removeAttribute('inert'); overview.setAttribute('aria-hidden', 'false');
+      if (overviewRenderedSort !== overviewSort || overviewContent.getAttribute('aria-busy') === 'true') await renderOverview(false, true);
+      overviewContent.querySelectorAll('.card-image').forEach((image) => {
+        if (overviewImageSources.has(image)) overviewImageObserver?.observe(image);
+      });
+    } else {
+      activeView = 'globe';
+      updateOverviewTabs(next);
+      ++overviewRenderToken;
+      document.body.classList.remove('globe-cards-view');
+      overview.setAttribute('inert', ''); overview.setAttribute('aria-hidden', 'true');
+      DOM.globeHost.removeAttribute('aria-hidden'); DOM.globeHost.removeAttribute('inert');
+      viewer.useDefaultRenderLoop = true;
+      viewer.resize();
+      if (overviewCameraSnapshot) viewer.camera.setView({ destination: overviewCameraSnapshot.destination, orientation: { direction: overviewCameraSnapshot.direction, up: overviewCameraSnapshot.up } });
+      viewer.scene.screenSpaceCameraController.enableInputs = !introActive;
+      viewer.scene.requestRender?.();
+    }
+
+  }
+
+  document.querySelector('#globe-view-switch .gv-grid')?.addEventListener('click', () => setOverviewView('cards'));
+  document.querySelector('#globe-view-switch .gv-globe')?.addEventListener('click', () => setOverviewView('globe'));
+  overviewSortButton.addEventListener('click', () => setOverviewMenu(!overviewMenuOpen));
+  overviewSortButton.addEventListener('keydown', (event) => {
+    if (['ArrowDown', 'ArrowUp'].includes(event.key)) { event.preventDefault(); setOverviewMenu(true, true); }
+  });
+  overviewOptions.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-sort]');
+    if (!option) return;
+    const changed = overviewSort !== option.dataset.sort;
+    overviewSort = option.dataset.sort;
+    overview.querySelector('#gbv-sort-value').textContent = option.textContent;
+    overviewOptionButtons.forEach((button) => button.setAttribute('aria-selected', String(button === option)));
+    setOverviewMenu(false); overviewSortButton.focus();
+    if (changed) renderOverview();
+  });
+  overviewOptions.addEventListener('keydown', (event) => {
+    const index = overviewOptionButtons.indexOf(document.activeElement);
+    let target;
+    if (event.key === 'ArrowDown') target = (index + 1) % overviewOptionButtons.length;
+    if (event.key === 'ArrowUp') target = (index - 1 + overviewOptionButtons.length) % overviewOptionButtons.length;
+    if (event.key === 'Home') target = 0;
+    if (event.key === 'End') target = overviewOptionButtons.length - 1;
+    if (target !== undefined) { event.preventDefault(); overviewOptionButtons[target].focus(); }
+    if (event.key === 'Tab') setOverviewMenu(false);
+  });
+  overview.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && overviewMenuOpen) { event.preventDefault(); event.stopImmediatePropagation(); setOverviewMenu(false); overviewSortButton.focus(); }
+  }, true);
+  overviewAlphabet.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-letter]');
+    if (!button || button.disabled) return;
+    const group = overviewGroupsOnScreen.find((entry) => entry.key === button.dataset.letter);
+    if (group) overview.scrollTo({ top: Math.max(0, overview.scrollTop + group.section.getBoundingClientRect().top - Math.max(78, parseFloat(getComputedStyle(overview.querySelector('.gbv-toolbar')).top) + overview.querySelector('.gbv-toolbar').offsetHeight + 14)), behavior: overviewReducedMotion() ? 'instant' : 'smooth' });
+  });
+  overview.addEventListener('scroll', () => {
+    if (!overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
+  }, { passive: true });
+  overview.addEventListener('click', (event) => event.stopPropagation());
+  overview.addEventListener('focusout', (event) => {
+    if (!overview.querySelector('.gbv-select').contains(event.relatedTarget)) setOverviewMenu(false);
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (!overview.querySelector('.gbv-select').contains(event.target)) setOverviewMenu(false);
+  });
 
   const searchRoot = document.createElement('section');
   searchRoot.id = 'globe-search';
@@ -2509,8 +2889,8 @@ function renderFamilyCards(speciesList = []) {
     if (searchRoot.classList.contains('is-open')) renderSearchResults();
   }
 
-  function snapshotSearchTooltipStyles() {
-    if (!DOM.tip) return [];
+  function snapshotSearchTooltipStyles(source = DOM.tip) {
+    if (!source) return [];
     // Preserve the source's rendered Webflow styles before IDs are removed.
     // This also supports rules scoped to #species-tooltip / #tooltip-card.
     const properties = [
@@ -2522,7 +2902,7 @@ function renderFamilyCards(speciesList = []) {
       'font-style', 'line-height', 'letter-spacing', 'text-align',
       'text-transform', 'text-decoration', 'object-fit', 'object-position'
     ];
-    return [DOM.tip, ...DOM.tip.querySelectorAll('*')].map((element) => {
+    return [source, ...source.querySelectorAll('*')].map((element) => {
       const style = getComputedStyle(element);
       const values = properties.map((property) => [property, style.getPropertyValue(property)]);
       if (element.tagName === 'IMG') {
@@ -2756,10 +3136,13 @@ function renderFamilyCards(speciesList = []) {
 
       addAllPoints();
       buildSearchIndex();
+      overviewDataReady = true;
+      if (activeView === 'cards') renderOverview(false);
       beginIntro();
     })
     .catch((error) => {
       console.warn(error);
       // The independent intro timeline stays usable even if species data fails.
+      overviewStatus.textContent = 'Die Arten konnten nicht geladen werden. Bitte die Seite neu laden.';
     });
 })();
