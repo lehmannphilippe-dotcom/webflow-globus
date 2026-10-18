@@ -1401,6 +1401,9 @@ html.globe-intro-active body { overflow: hidden; }
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
   --gbv-arrow: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJrZXlib2FyZF9hcnJvd19kb3duXzI0ZHBfRTNFM0UzX0ZJTEwwX3dnaHQ0MDBfR1JBRDBfb3BzejI0IDEiPgo8cGF0aCBpZD0iVmVjdG9yIiBkPSJNMTIgMTUuNEw2IDkuNEw3LjQgOEwxMiAxMi42TDE2LjYgOEwxOCA5LjRMMTIgMTUuNFoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L3N2Zz4K");
+  --gbv-inset-left: 16px;
+  --gbv-inset-right: 16px;
+  --gbv-header-depth: 96px;
   position: fixed;
   inset: 0;
   z-index: 5;
@@ -1409,7 +1412,7 @@ html.globe-intro-active body { overflow: hidden; }
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
-  background: #121641;
+  background: #04052a;
   padding: 0 16px max(48px, env(safe-area-inset-bottom, 0px));
   opacity: 0;
   visibility: hidden;
@@ -1421,7 +1424,19 @@ html.globe-intro-active body { overflow: hidden; }
 body.globe-cards-view #species-browser { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
 body.globe-cards-view #globe { opacity: 0 !important; pointer-events: none !important; }
 body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
-#species-browser .gbv-toolbar { display: flex; flex-direction: column; align-items: center; gap: 0; position: sticky; top: 64px; z-index: 3; background: #121641; padding-bottom: 10px; margin: 96px 0 0; }
+#species-browser .gbv-toolbar { display: flex; flex-direction: column; align-items: center; gap: 0; position: sticky; top: 64px; z-index: 3; background: #04052a; padding-bottom: 10px; margin: 96px 0 0; }
+/* Opaque band extends from the sticky sort toolbar through the whole header. */
+#species-browser .gbv-toolbar::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--gbv-header-depth));
+  bottom: 0;
+  left: calc(-1 * var(--gbv-inset-left));
+  right: calc(-1 * var(--gbv-inset-right));
+  z-index: -1;
+  background: #04052a;
+  pointer-events: none;
+}
 #species-browser .gbv-caption { color: rgba(125,161,218,.8); font: 400 14px/24px Inter, sans-serif; text-align: center; }
 #species-browser .gbv-select { position: relative; width: min(245px, 100%); z-index: 2; }
 #species-browser .gbv-sort, #species-browser .gbv-options button {
@@ -1452,12 +1467,12 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
 #species-browser .gbv-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 0 0 13px; color: #7da1da; font: 700 50px/1 Inter, sans-serif; overflow-wrap: anywhere; }
 #species-browser .gbv-count { font: 400 18px/24px Inter, sans-serif; }
 #species-browser .gbv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: stretch; }
-#species-browser .gbv-card { display: flex !important; flex-direction: column !important; position: relative; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; box-sizing: border-box !important; flex: none !important; cursor: pointer; }
+#species-browser .gbv-card { display: flex !important; flex-direction: column !important; position: relative; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; align-self: stretch !important; box-sizing: border-box !important; flex: none !important; cursor: pointer; }
 #species-browser .gbv-card .card-image { width: 100% !important; max-width: 100% !important; height: auto !important; aspect-ratio: 1; flex: 0 0 auto !important; }
 #species-browser .gbv-card .card-body { width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; flex: 1 1 auto !important; }
 #species-browser .gbv-card .card-name-de, #species-browser .gbv-card .card-name-lat, #species-browser .gbv-card .card-habitat { height: auto !important; max-height: none !important; white-space: normal !important; overflow-wrap: anywhere; }
 #species-browser .gbv-card:focus-visible { outline: 2px solid #ff5100; outline-offset: 2px; }
-#species-browser.has-alphabet { padding-right: 44px; }
+#species-browser.has-alphabet { --gbv-inset-right: 44px; padding-right: 44px; }
 #species-browser .gbv-alphabet { position: fixed; right: max(4px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; width: 24px; }
 #species-browser .gbv-alphabet[hidden] { display: none; }
 #species-browser .gbv-alphabet button { padding: 0; width: 24px; height: clamp(13px, 2.5dvh, 22px); border: 0; background: transparent; color: #7da1da; font: 700 clamp(10px, 1.7dvh, 18px)/1 Inter, sans-serif; cursor: pointer; }
@@ -1466,14 +1481,14 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
 #species-browser .gbv-alphabet button:focus-visible { outline: 1px solid #ff5100; border-radius: 3px; }
 #species-browser .gbv-status { color: #7da1da; font: 400 16px/24px Inter, sans-serif; }
 #species-browser .is-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@media (max-width: 1100px) and (min-width: 861px) { #species-browser .gbv-toolbar { margin-top: 124px; top: 116px; } }
+@media (max-width: 1100px) and (min-width: 861px) { #species-browser { --gbv-header-depth: 124px; } #species-browser .gbv-toolbar { margin-top: 124px; top: 116px; } }
 @media (max-width: 860px) {
-  #species-browser { padding: 0 12px max(40px, env(safe-area-inset-bottom, 0px)); }
+  #species-browser { --gbv-inset-left: 12px; --gbv-inset-right: 12px; --gbv-header-depth: 88px; padding: 0 12px max(40px, env(safe-area-inset-bottom, 0px)); }
   #species-browser .gbv-toolbar { margin-top: 88px; }
   #species-browser .gbv-heading { font-size: 34px; line-height: 1.1; gap: 6px; }
   #species-browser .gbv-count { font-size: 14px; line-height: 20px; }
   #species-browser .gbv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #species-browser.has-alphabet { padding-right: 34px; }
+  #species-browser.has-alphabet { --gbv-inset-right: 34px; padding-right: 34px; }
   #species-browser .gbv-alphabet { width: 20px; }
   #species-browser .gbv-alphabet button { width: 20px; height: clamp(12px, 1.8dvh, 18px); font-size: 11px; }
 }
