@@ -1564,6 +1564,7 @@
   let speciesReturnView = null;
   let speciesFlightToken = 0;
   let speciesResizeTimer = 0;
+  let speciesMotionTimer = 0;
   const speciesDesktop = () => innerWidth > 860;
 
   function rememberSpeciesView() {
@@ -1609,12 +1610,14 @@
     const usableH = Math.max(20, height - 128);
     const tanY = Math.tan(frustum.fovy / 2);
     const tanX = tanY * frustum.aspectRatio;
+    // Keep the range around a quarter of the available span, like the reference.
+    const contextScale = 4;
     let altitude = CONFIG.ZOOM_IN_STOP_HEIGHT_M;
     for (const position of positions) {
       const local = Cesium.Matrix4.multiplyByPoint(inverse, position, new Cesium.Cartesian3());
       altitude = Math.max(altitude,
-        local.z + Math.abs(local.x) / (tanX * usableW / width) * 1.08,
-        local.z + Math.abs(local.y) / (tanY * usableH / height) * 1.08);
+        local.z + Math.abs(local.x) / (tanX * usableW / width) * contextScale,
+        local.z + Math.abs(local.y) / (tanY * usableH / height) * contextScale);
       // Keep distant vertices on the visible hemisphere as well as in the frame.
       const normal = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(position, new Cesium.Cartesian3());
       const up = Cesium.Matrix4.getColumn(frame, 2, new Cesium.Cartesian4());
@@ -1624,21 +1627,30 @@
     return Cesium.Cartesian3.fromRadians(centre.longitude, centre.latitude, altitude);
   }
 
-  async function focusSpecies(item) {
+  async function focusSpecies(item, openPanel = false) {
     const token = ++speciesFlightToken;
     viewer.camera.cancelFlight();
-    if (activeView !== 'globe' || !speciesDesktop()) { await hideRanges(); return; }
+    if (activeView !== 'globe' || !speciesDesktop()) {
+      await hideRanges();
+      if (openPanel && token === speciesFlightToken) setPanelOpen(true);
+      return;
+    }
     await showRangesForItem(item);
-    if (token !== speciesFlightToken || !document.body.classList.contains('panel-open')) return;
+    if (token !== speciesFlightToken || (!openPanel && !document.body.classList.contains('panel-open'))) return;
     let positions = speciesRangePositions();
     if (!positions.length && item.location?.lng != null && item.location?.lat != null) {
       const lng = Number(item.location.lng), lat = Number(item.location.lat);
       if (Number.isFinite(lng) && Number.isFinite(lat)) positions = [Cesium.Cartesian3.fromDegrees(lng, lat)];
     }
-    if (!positions.length) return;
+    if (!positions.length) { if (openPanel) setPanelOpen(true); return; }
     const canvas = viewer.scene.canvas;
     const destination = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
       DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
+    clearTimeout(speciesMotionTimer);
+    document.body.classList.add('species-camera-motion');
+    // Commit the resting transform before starting both movements in one frame.
+    void DOM.globeHost.offsetWidth;
+    if (openPanel) setPanelOpen(true);
     updatePanelShiftVar();
     viewer.camera.flyTo({ destination,
       orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
@@ -1658,6 +1670,10 @@
       duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3,
       easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
     });
+    clearTimeout(speciesMotionTimer);
+    speciesMotionTimer = setTimeout(() => {
+      if (!speciesReturnView) document.body.classList.remove('species-camera-motion');
+    }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3050);
   }
 
   function scheduleSpeciesReframe() {
@@ -2123,9 +2139,8 @@ function renderFamilyCards(speciesList = []) {
       return;
     }
     setAllPointsVisible(false);
-    setPanelOpen(true);
 
-    await focusSpecies(item);
+    await focusSpecies(item, true);
   }
 
   function openGenusPanelByKey(genusKey) {
