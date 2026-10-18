@@ -31,6 +31,13 @@
     LAND_MASK_URL:
       "https://cdn.prod.website-files.com/6a2856622c4f26c0e72a657b/6ad388d22b6b727fa6c79c29_world.watermask.4096x2048.png",
 
+    // Geographic framing matched to the supplied desktop / portrait references.
+    HAWAII_VIEW: {
+      desktop: { west: -174.5, south: 14.8, east: -150.7, north: 29.5 },
+      compact: { west: -160.3, south: 18.6, east: -154.4, north: 22.5 },
+      duration: 3
+    },
+
     POINT_COLOR: "#FF5100",
     POINT_SIZE: 8,
 
@@ -190,6 +197,11 @@
   let introMaskReady = false;
   let introLandStage = null;
   let introGlobeVisible = false;
+  let hawaiiFlightPending = false;
+  let hawaiiFlightActive = false;
+  let hawaiiOverviewLocked = false;
+  let hawaiiFlightToken = 0;
+  let hawaiiResizeTimer = 0;
   let revealIntroPoints = () => {};
   const INTRO_START = 500;
   const INTRO_TARGET = 1470;
@@ -215,7 +227,7 @@
       <p class="gi-description" aria-hidden="true">Vogelarten hat der Mensch<br>bis heute ausgerottet.</p>
       <div class="gi-details">
         <p class="gi-regions">Verfügbare Regionen erforschen</p>
-        <button type="button" class="gi-hawaii">Hawaii</button>
+        <button type="button" class="gi-hawaii"><span class="gi-hawaii-label">Hawaii</span></button>
       </div>
     </div>`;
   document.body.appendChild(intro);
@@ -287,6 +299,7 @@
           introGlobeVisible = true;
           DOM.globeHost.classList.add('gi-globe-visible');
           intro.classList.add('is-globe-visible');
+          if (hawaiiFlightPending) flyToHawaii();
           setTimeout(() => DOM.globeHost.classList.remove('gi-globe-stage', 'gi-globe-visible'), introReducedMotion ? 0 : 1250);
         }
       }
@@ -298,6 +311,77 @@
       if (introGlobeVisible && !introActive) removeListener();
     });
   }
+
+  function hawaiiViewRectangle() {
+    const canvas = viewer.scene.canvas;
+    const width = canvas.clientWidth || innerWidth || 1;
+    const height = canvas.clientHeight || innerHeight || 1;
+    const wide = width > 860 && width / height >= 1.2;
+    const bounds = wide ? CONFIG.HAWAII_VIEW.desktop : CONFIG.HAWAII_VIEW.compact;
+    return Cesium.Rectangle.fromDegrees(bounds.west, bounds.south, bounds.east, bounds.north);
+  }
+
+  function flyToHawaii(duration = CONFIG.HAWAII_VIEW.duration) {
+    if (!introViewerReady || !introGlobeVisible) {
+      hawaiiFlightPending = true;
+      return;
+    }
+    hawaiiFlightPending = false;
+    // Invalidate old callbacks before cancelling an interrupted / resized flight.
+    const token = ++hawaiiFlightToken;
+    viewer.camera.cancelFlight();
+    const controls = viewer.scene.screenSpaceCameraController;
+    const finish = (complete) => {
+      if (token !== hawaiiFlightToken) return;
+      hawaiiFlightActive = false;
+      hawaiiOverviewLocked = complete;
+      controls.enableInputs = !introActive && !document.body.classList.contains('panel-open');
+    };
+    try {
+      viewer.resize();
+      const destination = viewer.camera.getRectangleCameraCoordinates(hawaiiViewRectangle());
+      if (!destination) throw new Error('Hawaii camera framing is unavailable');
+      hawaiiFlightActive = true;
+      hawaiiOverviewLocked = true;
+      controls.enableInputs = false;
+      // Cesium follows the ellipsoid from the current side of Earth while zooming.
+      viewer.camera.flyTo({
+        destination,
+        orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
+        duration: introReducedMotion ? 0 : duration,
+        easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT,
+        complete: () => finish(true),
+        cancel: () => finish(false)
+      });
+      viewer.scene.requestRender?.();
+    } catch (error) {
+      finish(false);
+      console.warn('Hawaii camera flight failed:', error);
+    }
+  }
+
+  function requestHawaiiFlight() {
+    if (!introActive) return;
+    hawaiiFlightPending = true;
+    dismissIntro();
+    if (introViewerReady) viewer.scene.screenSpaceCameraController.enableInputs = false;
+    flyToHawaii();
+  }
+
+  function scheduleHawaiiReframe() {
+    clearTimeout(hawaiiResizeTimer);
+    if (!hawaiiOverviewLocked && !hawaiiFlightPending) return;
+    hawaiiResizeTimer = setTimeout(() => {
+      if (hawaiiOverviewLocked || hawaiiFlightPending) flyToHawaii(.8);
+    }, 200);
+  }
+
+  introHawaii.setAttribute('aria-label', 'Hawaii auf der Karte erkunden');
+  introHawaii.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    requestHawaiiFlight();
+  });
 
   intro.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -1209,7 +1293,7 @@
 
   const scc = viewer.scene.screenSpaceCameraController;
   introViewerReady = true;
-  scc.enableInputs = !introActive;
+  scc.enableInputs = !introActive && !hawaiiFlightPending;
   scc.minimumZoomDistance = Math.max(5, CONFIG.ZOOM_IN_STOP_HEIGHT_M);
   scc.maximumZoomDistance = CONFIG.ZOOM_OUT_STOP_HEIGHT_M;
   scc.enableTilt = false;
@@ -1220,6 +1304,12 @@
   });
 
   watchIntroGlobe();
+  // Reframe on resize only until the user starts exploring the arrived overview.
+  const releaseHawaiiOverview = () => {
+    if (!hawaiiFlightActive && !hawaiiFlightPending) hawaiiOverviewLocked = false;
+  };
+  viewer.scene.canvas.addEventListener('pointerdown', releaseHawaiiOverview, { passive: true });
+  viewer.scene.canvas.addEventListener('wheel', releaseHawaiiOverview, { passive: true });
 
   const baseLayer = viewer.imageryLayers.get(0);
   if (baseLayer) Object.assign(baseLayer, CONFIG.STYLE);
@@ -1249,6 +1339,7 @@
     "resize",
     () => {
       requestViewerResize();
+      scheduleHawaiiReframe();
       updateCardRailTitleLayout(DOM.genusCards);
       updateCardRailTitleLayout(DOM.familyCards);
       updateFamilyGenusStickyTracks(DOM.familyCards);
@@ -1315,7 +1406,7 @@
       document.body.classList.remove("panel-open");
       document.body.style.setProperty("--panel-shift", "0px");
       if (viewer?.scene?.screenSpaceCameraController) {
-        viewer.scene.screenSpaceCameraController.enableInputs = true;
+        viewer.scene.screenSpaceCameraController.enableInputs = !introActive && !hawaiiFlightActive && !hawaiiFlightPending;
       }
     }
     requestViewerResize();
@@ -2276,7 +2367,7 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     (m) => {
-      if (introActive || document.body.classList.contains("panel-open")) return;
+      if (introActive || hawaiiFlightActive || hawaiiFlightPending || document.body.classList.contains("panel-open")) return;
       if (inDetailMode) {
         hideTooltip();
         return;
@@ -2290,7 +2381,7 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     async (c) => {
-      if (introActive) return;
+      if (introActive || hawaiiFlightActive || hawaiiFlightPending) return;
       const picked = viewer.scene.pick(c.position);
       const item = picked?.primitive?.id;
 
