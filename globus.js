@@ -2670,7 +2670,9 @@ function renderFamilyCards(speciesList = []) {
       heading.className = 'gbv-heading';
       heading.id = `${section.id}-heading`;
       section.setAttribute('aria-labelledby', heading.id);
-      const title = document.createElement('span'); title.textContent = group.label;
+      const title = document.createElement('span'); title.textContent = overviewSort === 'region'
+        ? (group.label === 'Hawaii (Big Island)' ? 'Hawaii' : group.label).toLocaleUpperCase('de')
+        : group.label;
       const count = document.createElement('span'); count.className = 'gbv-count';
       count.textContent = `${group.items.length} ${group.items.length === 1 ? 'Art/Form' : 'Arten/Formen'}`;
       heading.append(title, count);
