@@ -1342,6 +1342,7 @@
     () => {
       requestViewerResize();
       scheduleHawaiiReframe();
+      scheduleSpeciesReframe();
       updateCardRailTitleLayout(DOM.genusCards);
       updateCardRailTitleLayout(DOM.familyCards);
       updateFamilyGenusStickyTracks(DOM.familyCards);
@@ -1365,7 +1366,7 @@
   }
 
   function shouldApplyPanelShift() {
-    return activeView === "globe" && getCameraHeightM() <= CONFIG.PANEL_SHIFT_MAX_HEIGHT_M;
+    return activeView === "globe" && (speciesReturnView !== null || getCameraHeightM() <= CONFIG.PANEL_SHIFT_MAX_HEIGHT_M);
   }
 
   let lastShiftFactor = 1;
@@ -1425,6 +1426,7 @@
   let activeRangeDS = [];
   let currentPrimaryPolygonDS = null;
   const rangeCache = new Map();
+  let rangeLoadToken = 0;
 
   const rangePoints = viewer.scene.primitives.add(
     new Cesium.PointPrimitiveCollection()
@@ -1467,6 +1469,7 @@
   }
 
   async function hideRanges() {
+    ++rangeLoadToken;
     try {
       for (const ds of activeRangeDS) {
         if (viewer.dataSources.contains(ds)) {
@@ -1487,7 +1490,10 @@
       return;
     }
 
-    await hideRanges();
+    const cleared = hideRanges();
+    const loadToken = rangeLoadToken;
+    await cleared;
+    if (loadToken !== rangeLoadToken) return;
 
     const primaryKey = ranges.range_native
       ? "range_native"
@@ -1510,11 +1516,17 @@
 
       let ds = rangeCache.get(url);
       if (!ds) {
-        ds = await Cesium.GeoJsonDataSource.load(url, { clampToGround: true });
+        try { ds = await Cesium.GeoJsonDataSource.load(url, { clampToGround: true }); }
+        catch (error) { console.warn("Verbreitungsfläche konnte nicht geladen werden", url, error); continue; }
         rangeCache.set(url, ds);
       }
 
-      if (!viewer.dataSources.contains(ds)) viewer.dataSources.add(ds);
+      if (loadToken !== rangeLoadToken) return;
+      if (!viewer.dataSources.contains(ds)) await viewer.dataSources.add(ds);
+      if (loadToken !== rangeLoadToken) {
+        if (!activeRangeDS.includes(ds) && viewer.dataSources.contains(ds)) viewer.dataSources.remove(ds, false);
+        return;
+      }
       stylePolygonDataSource(ds, key);
       activeRangeDS.push(ds);
 
@@ -1525,9 +1537,10 @@
       const pointUrl = ranges[pointKey];
       if (!pointUrl) continue;
 
-      const dsPts = await Cesium.GeoJsonDataSource.load(pointUrl, {
-        clampToGround: true
-      });
+      let dsPts;
+      try { dsPts = await Cesium.GeoJsonDataSource.load(pointUrl, { clampToGround: true }); }
+      catch (error) { console.warn("Fundpunkte konnten nicht geladen werden", pointUrl, error); continue; }
+      if (loadToken !== rangeLoadToken) return;
 
       const t = Cesium.JulianDate.now();
       const st = CONFIG.RANGE_POINTS[pointKey];
@@ -1547,213 +1560,112 @@
     }
   }
 
-  // =========================================================
-  // SMART VIEW
-  // =========================================================
-  function getPanelRect() {
-    if (!DOM.panelEl) return null;
-    const r = DOM.panelEl.getBoundingClientRect();
-    return !r || r.width <= 0 || r.height <= 0 ? null : r;
-  }
+  // One return view for the whole detail-panel session, including species changes.
+  let speciesReturnView = null;
+  let speciesFlightToken = 0;
+  let speciesResizeTimer = 0;
+  const speciesDesktop = () => innerWidth > 860;
 
-  function getSafeViewportRect() {
-    const canvas = viewer.scene.canvas;
-    const W = canvas?.clientWidth || innerWidth;
-    const H = canvas?.clientHeight || innerHeight;
-    const m = CONFIG.VIEW_MARGIN_PX;
-
-    let left = m;
-    let top = m;
-    let right = W - m;
-    let bottom = H - m;
-
-    if (document.body.classList.contains("panel-open")) {
-      const pr = getPanelRect();
-      if (pr) right = Math.min(right, pr.left - m);
-    }
-
-    left = Math.max(0, left);
-    top = Math.max(0, top);
-    right = Math.max(left + 10, right);
-    bottom = Math.max(top + 10, bottom);
-
-    return {
-      left,
-      top,
-      right,
-      bottom,
-      width: right - left,
-      height: bottom - top
+  function rememberSpeciesView() {
+    if (activeView !== 'globe' || !speciesDesktop()) return;
+    viewer.camera.cancelFlight();
+    if (!speciesReturnView) speciesReturnView = {
+      destination: Cesium.Cartesian3.clone(viewer.camera.positionWC),
+      orientation: {
+        direction: Cesium.Cartesian3.clone(viewer.camera.directionWC),
+        up: Cesium.Cartesian3.clone(viewer.camera.upWC)
+      }
     };
+    hawaiiOverviewLocked = false;
+    lastShiftFactor = .5;
   }
 
-  function computeRangeScreenRect(ds) {
-    if (!ds) return null;
-
+  function speciesRangePositions() {
+    const result = [];
     const time = Cesium.JulianDate.now();
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let any = false;
-
-    for (const e of ds.entities.values) {
-      if (!e.polygon || !e.polygon.hierarchy) continue;
-
-      let hier;
-      try {
-        hier = e.polygon.hierarchy.getValue(time);
-      } catch {
-        hier = null;
-      }
-
-      if (!hier?.positions?.length) continue;
-
-      const step = Math.max(1, CONFIG.RANGE_SAMPLE_STEP);
-      for (let i = 0; i < hier.positions.length; i += step) {
-        const w = Cesium.SceneTransforms.wgs84ToWindowCoordinates(
-          viewer.scene,
-          hier.positions[i]
-        );
-        if (!w) continue;
-
-        any = true;
-        minX = Math.min(minX, w.x);
-        minY = Math.min(minY, w.y);
-        maxX = Math.max(maxX, w.x);
-        maxY = Math.max(maxY, w.y);
-      }
-    }
-
-    if (!any || !isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
-      return null;
-    }
-
-    return {
-      left: minX,
-      top: minY,
-      right: maxX,
-      bottom: maxY,
-      width: maxX - minX,
-      height: maxY - minY
+    const visit = (hierarchy) => {
+      if (!hierarchy) return;
+      for (const position of hierarchy.positions || []) result.push(position);
+      for (const hole of hierarchy.holes || []) visit(hole);
     };
+    for (const ds of activeRangeDS) for (const entity of ds.entities.values) {
+      if (entity.polygon?.hierarchy) visit(entity.polygon.hierarchy.getValue(time));
+    }
+    return result;
   }
 
-  function isFullyInside(inner, outer) {
-    return (
-      inner.left >= outer.left &&
-      inner.right <= outer.right &&
-      inner.top >= outer.top &&
-      inner.bottom <= outer.bottom
+  // Fit all vertices in a north-up tangent frame, using only the unobscured width.
+  // The canvas shifts by half the panel width, so its centre matches the free map.
+  function speciesDestination(positions, width, height, panelWidth, frustum) {
+    const rectangle = Cesium.Rectangle.fromCartesianArray(positions);
+    const centre = Cesium.Rectangle.center(rectangle);
+    const frame = Cesium.Transforms.eastNorthUpToFixedFrame(
+      Cesium.Cartesian3.fromRadians(centre.longitude, centre.latitude)
     );
-  }
-
-  function coverage(rangeRect, safeRect) {
-    const a = Math.max(0, rangeRect.width) * Math.max(0, rangeRect.height);
-    const b = Math.max(1, safeRect.width) * Math.max(1, safeRect.height);
-    return a / b;
-  }
-
-  function angleFromPixels(dxPx, axis = "x") {
-    const size =
-      axis === "x"
-        ? viewer.scene.canvas?.clientWidth || innerWidth || 1
-        : viewer.scene.canvas?.clientHeight || innerHeight || 1;
-    const fov = viewer.camera.frustum?.fov || Math.PI / 3;
-    const ang = (dxPx / Math.max(1, size)) * fov;
-    return U.clamp(ang, CONFIG.VIEW_PAN_MIN_ANGLE, CONFIG.VIEW_PAN_MAX_ANGLE);
-  }
-
-  function panToReduceOverflow(rangeRect, safeRect) {
-    let did = false;
-
-    if (rangeRect.right > safeRect.right) {
-      try {
-        viewer.camera.rotateRight(
-          angleFromPixels(rangeRect.right - safeRect.right, "x")
-        );
-        did = true;
-      } catch {}
-    } else if (rangeRect.left < safeRect.left) {
-      try {
-        viewer.camera.rotateLeft(
-          angleFromPixels(safeRect.left - rangeRect.left, "x")
-        );
-        did = true;
-      } catch {}
+    const inverse = Cesium.Matrix4.inverseTransformation(frame, new Cesium.Matrix4());
+    const margin = Math.max(CONFIG.VIEW_MARGIN_PX, 32);
+    const usableW = Math.max(20, width - panelWidth - 2 * margin);
+    // Equal top/bottom allowance also keeps geometry clear of the header.
+    const usableH = Math.max(20, height - 128);
+    const tanY = Math.tan(frustum.fovy / 2);
+    const tanX = tanY * frustum.aspectRatio;
+    let altitude = CONFIG.ZOOM_IN_STOP_HEIGHT_M;
+    for (const position of positions) {
+      const local = Cesium.Matrix4.multiplyByPoint(inverse, position, new Cesium.Cartesian3());
+      altitude = Math.max(altitude,
+        local.z + Math.abs(local.x) / (tanX * usableW / width) * 1.08,
+        local.z + Math.abs(local.y) / (tanY * usableH / height) * 1.08);
+      // Keep distant vertices on the visible hemisphere as well as in the frame.
+      const normal = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(position, new Cesium.Cartesian3());
+      const up = Cesium.Matrix4.getColumn(frame, 2, new Cesium.Cartesian4());
+      const cosine = Cesium.Cartesian3.dot(normal, up);
+      if (cosine > .01) altitude = Math.max(altitude, 6378137 * (1 / cosine - 1) * 1.02);
     }
-
-    if (rangeRect.bottom > safeRect.bottom) {
-      try {
-        viewer.camera.rotateDown(
-          angleFromPixels(rangeRect.bottom - safeRect.bottom, "y")
-        );
-        did = true;
-      } catch {}
-    } else if (rangeRect.top < safeRect.top) {
-      try {
-        viewer.camera.rotateUp(
-          angleFromPixels(safeRect.top - rangeRect.top, "y")
-        );
-        did = true;
-      } catch {}
-    }
-
-    if (did) viewer.scene.requestRender?.();
-    return did;
+    return Cesium.Cartesian3.fromRadians(centre.longitude, centre.latitude, altitude);
   }
 
-  function zoomByStep(direction) {
-    const h = getCameraHeightM();
-    const step = Math.max(50, h * CONFIG.VIEW_ZOOM_STEP_FRAC);
-
-    try {
-      direction === "out" ? viewer.camera.zoomOut(step) : viewer.camera.zoomIn(step);
-      viewer.scene.requestRender?.();
-      return true;
-    } catch {
-      return false;
+  async function focusSpecies(item) {
+    const token = ++speciesFlightToken;
+    viewer.camera.cancelFlight();
+    if (activeView !== 'globe' || !speciesDesktop()) { await hideRanges(); return; }
+    await showRangesForItem(item);
+    if (token !== speciesFlightToken || !document.body.classList.contains('panel-open')) return;
+    let positions = speciesRangePositions();
+    if (!positions.length && item.location?.lng != null && item.location?.lat != null) {
+      const lng = Number(item.location.lng), lat = Number(item.location.lat);
+      if (Number.isFinite(lng) && Number.isFinite(lat)) positions = [Cesium.Cartesian3.fromDegrees(lng, lat)];
     }
+    if (!positions.length) return;
+    const canvas = viewer.scene.canvas;
+    const destination = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
+      DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
+    updatePanelShiftVar();
+    viewer.camera.flyTo({ destination,
+      orientation: { heading: 0, pitch: -Cesium.Math.PI_OVER_TWO, roll: 0 },
+      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3,
+      easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+    });
   }
 
-  async function smartAdjustViewToRange(ds) {
-    if (!ds) return;
+  function restoreSpeciesView() {
+    ++speciesFlightToken;
+    clearTimeout(speciesResizeTimer);
+    const saved = speciesReturnView;
+    speciesReturnView = null;
+    if (!saved || activeView !== 'globe') return;
+    viewer.camera.cancelFlight();
+    viewer.camera.flyTo({ ...saved,
+      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 3,
+      easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+    });
+  }
 
-    await new Promise((r) => doubleRAF(r));
-    const safe = getSafeViewportRect();
-
-    for (let iter = 0; iter < CONFIG.VIEW_MAX_ITERS; iter++) {
-      const rr = computeRangeScreenRect(ds);
-      if (!rr) return;
-
-      const inside = isFullyInside(rr, safe);
-      const cov = coverage(rr, safe);
-
-      if (!inside) {
-        const didPan = panToReduceOverflow(rr, safe);
-        await new Promise((r) => requestAnimationFrame(r));
-
-        if (!didPan || iter >= CONFIG.VIEW_PAN_ITERS_BEFORE_ZOOM) {
-          zoomByStep("out");
-          await new Promise((r) => doubleRAF(r));
-        }
-        continue;
-      }
-
-      if (cov < CONFIG.VIEW_MIN_COVERAGE) {
-        zoomByStep("in");
-        await new Promise((r) => doubleRAF(r));
-        continue;
-      }
-
-      if (cov > CONFIG.VIEW_MAX_COVERAGE) {
-        zoomByStep("out");
-        await new Promise((r) => doubleRAF(r));
-        continue;
-      }
-
-      return;
-    }
+  function scheduleSpeciesReframe() {
+    clearTimeout(speciesResizeTimer);
+    if (!speciesReturnView || !document.body.classList.contains('panel-open')) return;
+    speciesResizeTimer = setTimeout(() => {
+      if (activeSpeciesItem) focusSpecies(activeSpeciesItem);
+    }, 200);
   }
 
   // =========================================================
@@ -2193,6 +2105,7 @@ function renderFamilyCards(speciesList = []) {
   async function openSpeciesFromCard(item) {
     if (!item) return;
 
+    rememberSpeciesView();
     closeSecondaryPanels();
     hideTooltip();
 
@@ -2212,8 +2125,7 @@ function renderFamilyCards(speciesList = []) {
     setAllPointsVisible(false);
     setPanelOpen(true);
 
-    await showRangesForItem(item);
-    await smartAdjustViewToRange(currentPrimaryPolygonDS);
+    await focusSpecies(item);
   }
 
   function openGenusPanelByKey(genusKey) {
@@ -2258,6 +2170,8 @@ function renderFamilyCards(speciesList = []) {
   }
 
   async function closeAllPanels() {
+    ++speciesFlightToken;
+    viewer.camera.cancelFlight();
     closeSecondaryPanels();
     closeAIImageModal();
     updateAIImageInfoButton(null);
@@ -2265,6 +2179,7 @@ function renderFamilyCards(speciesList = []) {
     resetAllPanelScrollPositions();
     await restoreDefaultState();
     setPanelOpen(false);
+    restoreSpeciesView();
     if (activeView === 'cards' && overviewReturnFocus?.isConnected) {
       overviewReturnFocus.focus({ preventScroll: true });
       overviewReturnFocus = null;
@@ -2398,22 +2313,7 @@ function renderFamilyCards(speciesList = []) {
       const item = picked?.primitive?.id;
 
       if (item) {
-        await restoreDefaultState();
-        closeSecondaryPanels();
-
-        setShiftFactorFromClick(c.position.x);
-        inDetailMode = true;
-        setAllPointsVisible(false);
-
-        fillPanel(item);
-        resetPanelScroll(DOM.panelEl);
-        resetPanelScroll(DOM.genusPanel);
-        resetPanelScroll(DOM.familyPanel);
-        resetCardRailScroll();
-        setPanelOpen(true);
-
-        await showRangesForItem(item);
-        await smartAdjustViewToRange(currentPrimaryPolygonDS);
+        await openSpeciesFromCard(item);
         return;
       }
 
