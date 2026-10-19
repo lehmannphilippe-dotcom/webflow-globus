@@ -1400,6 +1400,33 @@ html.globe-intro-active body { overflow: hidden; }
 /* Camera framing never translates the canvas, including during panel return. */
 body.panel-open #globe { transform: none; }
 
+/* Figma range popup (2290:2904), independent of the Webflow species card. */
+#range-hover-popup {
+  position: fixed;
+  z-index: 19;
+  box-sizing: border-box;
+  width: 297px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 88px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  background: #121641;
+  border-radius: 20px;
+  padding: 12px;
+  color: #7da1da;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+}
+#range-hover-popup[hidden] { display: none; }
+#range-hover-popup .rh-title { margin: 0; color: var(--rh-color); font: 700 16px/20px Inter, sans-serif; }
+#range-hover-popup .rh-text { margin: 0; color: #7da1da; font: 400 14px/18px Inter, sans-serif; white-space: pre-line; }
+@media (max-width: 860px) { #range-hover-popup { display: none; } }
+/* Let Cesium receive pointer movement through the otherwise blocking backdrop. */
+@media (min-width: 861px) {
+  body.panel-open.range-hover-enabled .info-overlay { pointer-events: none !important; }
+}
+
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
   --gbv-arrow: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJrZXlib2FyZF9hcnJvd19kb3duXzI0ZHBfRTNFM0UzX0ZJTEwwX3dnaHQ0MDBfR1JBRDBfb3BzejI0IDEiPgo8cGF0aCBpZD0iVmVjdG9yIiBkPSJNMTIgMTUuNEw2IDkuNEw3LjQgOEwxMiAxMi42TDE2LjYgOEwxOCA5LjRMMTIgMTUuNFoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L3N2Zz4K");
