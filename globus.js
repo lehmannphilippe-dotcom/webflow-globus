@@ -1523,7 +1523,8 @@
 
   // Genus panels show ordinary species markers plus only these two area layers.
   async function showGenusMap(items) {
-    ++speciesFlightToken;
+    const flightToken = ++speciesFlightToken;
+    rememberSpeciesView();
     viewer.camera.cancelFlight();
     activeGenusItems = items;
     inDetailMode = true;
@@ -1558,6 +1559,33 @@
       stylePolygonDataSource(ds, key);
       activeRangeDS.push(ds);
     }
+    if (loadToken === rangeLoadToken && flightToken === speciesFlightToken && activeGenusItems === items) {
+      frameGenusMap();
+    }
+  }
+
+  function genusMapPositions() {
+    const positions = speciesRangePositions();
+    // Regular species markers are separate from range/fossil spot primitives.
+    for (let i = 0; i < points.length; i++) {
+      const point = points.get(i);
+      if (point.show && point.position) positions.push(point.position);
+    }
+    return positions;
+  }
+
+  function frameGenusMap() {
+    if (activeGenusItems === null || activeView !== 'globe' || !speciesDesktop()) return;
+    const positions = genusMapPositions();
+    if (!positions.length) return;
+    const canvas = viewer.scene.canvas;
+    const target = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
+      DOM.genusPanel?.offsetWidth || DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
+    viewer.camera.cancelFlight();
+    viewer.camera.flyTo({ ...target,
+      duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS,
+      easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+    });
   }
 
   // One return view for the whole detail-panel session, including species changes.
@@ -1685,9 +1713,10 @@
 
   function scheduleSpeciesReframe() {
     clearTimeout(speciesResizeTimer);
-    if (activeGenusItems !== null || !speciesReturnView || !document.body.classList.contains('panel-open')) return;
+    if (!speciesReturnView || !document.body.classList.contains('panel-open')) return;
     speciesResizeTimer = setTimeout(() => {
-      if (activeSpeciesItem) focusSpecies(activeSpeciesItem);
+      if (activeGenusItems !== null) frameGenusMap();
+      else if (activeSpeciesItem) focusSpecies(activeSpeciesItem);
     }, 200);
   }
 
