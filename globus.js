@@ -1393,6 +1393,155 @@
     new Cesium.PointPrimitiveCollection()
   );
 
+  // Range popup: separate from the existing Webflow species tooltip/card.
+  let rangeHoverTargets = new WeakMap();
+  let hoveredRange = null;
+  let rangeHoverHideTimer = 0;
+  const rangeSpotAnimations = new Map();
+  const rangePopup = document.createElement('aside');
+  rangePopup.id = 'range-hover-popup';
+  rangePopup.hidden = true;
+  rangePopup.setAttribute('role', 'tooltip');
+  rangePopup.innerHTML = '<p class="rh-title"></p><p class="rh-text"></p>';
+  const rangePopupTitle = rangePopup.querySelector('.rh-title');
+  const rangePopupText = rangePopup.querySelector('.rh-text');
+  document.body.appendChild(rangePopup);
+
+  function rangePopupContent(title, text) {
+    // Placeholder text is intentional content; only null/missing fields are absent.
+    const clean = value => value == null ? null : String(value);
+    title = clean(title); text = clean(text);
+    return title === null && text === null ? null : { title, text };
+  }
+
+  function registerRangeAreas(ds, key, item) {
+    const content = item.range_popups?.[key];
+    const color = CONFIG.RANGES_STYLE[key]?.fill?.toCssColorString();
+    for (const entity of ds.entities.values) if (entity.polygon) {
+      rangeHoverTargets.set(entity, {
+        kind: 'area', color,
+        content: rangePopupContent(content?.title, content?.text)
+      });
+    }
+  }
+
+  function registerRangeSpot(point, entity, key) {
+    const time = Cesium.JulianDate.now();
+    const properties = entity.properties?.getValue(time) || {};
+    rangeHoverTargets.set(point, {
+      kind: 'spot', point, baseSize: point.pixelSize,
+      color: CONFIG.RANGE_POINTS[key].color,
+      content: rangePopupContent(properties.title, properties.description)
+    });
+  }
+
+  function animateRangeSpot(target, grow, immediate = false) {
+    if (target?.kind !== 'spot') return;
+    const point = target.point;
+    cancelAnimationFrame(rangeSpotAnimations.get(point));
+    rangeSpotAnimations.delete(point);
+    const size = target.baseSize * (grow ? 1.5 : 1);
+    if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      point.pixelSize = size;
+      viewer.scene.requestRender?.();
+      return;
+    }
+    const from = point.pixelSize;
+    const started = performance.now();
+    const tick = () => {
+      const p = Math.min(1, (performance.now() - started) / 150);
+      point.pixelSize = from + (size - from) * (1 - (1 - p) ** 3);
+      viewer.scene.requestRender?.();
+      if (p < 1) rangeSpotAnimations.set(point, requestAnimationFrame(tick));
+      else rangeSpotAnimations.delete(point);
+    };
+    tick();
+  }
+
+  function hideRangeHover(immediate = false) {
+    clearTimeout(rangeHoverHideTimer);
+    rangeHoverHideTimer = 0;
+    animateRangeSpot(hoveredRange, false, immediate);
+    hoveredRange = null;
+    rangePopup.hidden = true;
+    if (immediate) {
+      // A shrinking point can belong to a collection about to be cleared.
+      for (const [point, raf] of rangeSpotAnimations) {
+        cancelAnimationFrame(raf);
+        const info = rangeHoverTargets.get(point);
+        if (info) point.pixelSize = info.baseSize;
+      }
+      rangeSpotAnimations.clear();
+    }
+  }
+
+  function scheduleRangeHoverHide() {
+    if (rangeHoverHideTimer) return;
+    rangeHoverHideTimer = setTimeout(() => hideRangeHover(), 120);
+  }
+
+  function canHoverRanges() {
+    return activeView === 'globe' && speciesDesktop() && inDetailMode
+      && activeGenusItems === null && !!activeSpeciesItem
+      && document.body.classList.contains('panel-open');
+  }
+
+  function resolveRangeHover(picked) {
+    return picked && (rangeHoverTargets.get(picked.id) || rangeHoverTargets.get(picked.primitive));
+  }
+
+  function positionRangePopup(position) {
+    const canvas = viewer.scene.canvas.getBoundingClientRect();
+    const margin = 12;
+    const left = Math.max(margin, canvas.left + margin);
+    const right = Math.min(innerWidth - margin, canvas.right - (DOM.panelEl?.offsetWidth || 0) - margin);
+    const top = Math.max(64, canvas.top + margin);
+    const bottom = Math.min(innerHeight - margin, canvas.bottom - margin);
+    rangePopup.style.maxWidth = `${Math.max(1, right - left)}px`;
+    rangePopup.style.maxHeight = `${Math.max(1, bottom - top)}px`;
+    const box = rangePopup.getBoundingClientRect();
+    const x = canvas.left + position.x, y = canvas.top + position.y;
+    const preferredX = x + 14 + box.width <= right ? x + 14 : x - box.width - 14;
+    const preferredY = y + 14 + box.height <= bottom ? y + 14 : y - box.height - 14;
+    rangePopup.style.left = `${Math.max(left, Math.min(preferredX, right - box.width))}px`;
+    rangePopup.style.top = `${Math.max(top, Math.min(preferredY, bottom - box.height))}px`;
+  }
+
+  function updateRangeHover(position) {
+    if (!canHoverRanges()) { hideRangeHover(true); return; }
+    // Spots take priority when they overlap a polygon.
+    const targets = viewer.scene.drillPick(position, 12).map(resolveRangeHover).filter(Boolean);
+    const target = targets.find(t => t.kind === 'spot') || targets[0];
+    if (!target) { scheduleRangeHoverHide(); return; }
+    clearTimeout(rangeHoverHideTimer); rangeHoverHideTimer = 0;
+    if (hoveredRange !== target) {
+      animateRangeSpot(hoveredRange, false);
+      hoveredRange = target;
+      animateRangeSpot(target, true);
+    }
+    if (!target.content) { rangePopup.hidden = true; return; }
+    rangePopupTitle.textContent = target.content.title ?? '';
+    rangePopupTitle.hidden = target.content.title === null;
+    rangePopupText.textContent = target.content.text ?? '';
+    rangePopupText.hidden = target.content.text === null;
+    rangePopup.style.setProperty('--rh-color', target.color);
+    rangePopup.hidden = false;
+    positionRangePopup(position);
+  }
+
+  rangePopup.addEventListener('pointerenter', () => {
+    clearTimeout(rangeHoverHideTimer); rangeHoverHideTimer = 0;
+    if (!canHoverRanges()) hideRangeHover(true);
+  });
+  rangePopup.addEventListener('pointerleave', () => hideRangeHover());
+  rangePopup.addEventListener('click', event => event.stopPropagation());
+  DOM.globeHost.addEventListener('pointerleave', event => {
+    if (!rangePopup.contains(event.relatedTarget)) scheduleRangeHoverHide();
+  });
+  addEventListener('blur', () => hideRangeHover(true));
+  addEventListener('resize', () => hideRangeHover(true), { passive: true });
+
+
   function clearRangePoints() {
     try {
       rangePoints.removeAll();
@@ -1430,6 +1579,9 @@
   }
 
   async function hideRanges() {
+    hideRangeHover(true);
+    rangeHoverTargets = new WeakMap();
+    document.body.classList.remove('range-hover-enabled');
     ++rangeLoadToken;
     try {
       for (const ds of activeRangeDS) {
@@ -1455,6 +1607,7 @@
     const loadToken = rangeLoadToken;
     await cleared;
     if (loadToken !== rangeLoadToken) return;
+    document.body.classList.toggle('range-hover-enabled', activeView === 'globe' && speciesDesktop());
 
     const primaryKey = ranges.range_native
       ? "range_native"
@@ -1489,6 +1642,7 @@
         return;
       }
       stylePolygonDataSource(ds, key);
+      registerRangeAreas(ds, key, item);
       activeRangeDS.push(ds);
 
       if (primaryKey && key === primaryKey) currentPrimaryPolygonDS = ds;
@@ -1511,12 +1665,13 @@
         const pos = e.position?.getValue(t);
         if (!pos) continue;
 
-        rangePoints.add({
+        const point = rangePoints.add({
           position: pos,
           pixelSize: st.size ?? 8,
           color: Cesium.Color.fromCssColorString(st.color),
           show: true
         });
+        registerRangeSpot(point, e, pointKey);
       }
     }
   }
@@ -2375,7 +2530,14 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     (m) => {
-      if (activeView !== 'globe' || introActive || hawaiiFlightActive || hawaiiFlightPending || document.body.classList.contains("panel-open")) return;
+      if (activeView !== 'globe') { hideRangeHover(true); return; }
+      if (document.body.classList.contains('panel-open')) {
+        hideTooltip();
+        updateRangeHover(m.endPosition);
+        return;
+      }
+      hideRangeHover(true);
+      if (introActive || hawaiiFlightActive || hawaiiFlightPending) return;
       if (inDetailMode) {
         hideTooltip();
         return;
@@ -2391,6 +2553,8 @@ function renderFamilyCards(speciesList = []) {
     async (c) => {
       if (activeView !== 'globe' || introActive || hawaiiFlightActive || hawaiiFlightPending) return;
       const picked = viewer.scene.pick(c.position);
+      // Hover targets are not species selections and do not close the art panel.
+      if (resolveRangeHover(picked)) return;
       const item = picked?.primitive?.id;
 
       if (item) {
