@@ -1532,7 +1532,7 @@
     const selected = new Set(items);
     for (let i = 0; i < points.length; i++) {
       const point = points.get(i);
-      point.show = selected.has(point.id);
+      point.show = items.length > 1 && selected.has(point.id);
     }
     const cleared = hideRanges();
     const loadToken = rangeLoadToken;
@@ -1571,6 +1571,15 @@
       const point = points.get(i);
       if (point.show && point.position) positions.push(point.position);
     }
+    // A one-species genus has no visible marker. If it also has no areas,
+    // still use its location to frame the map without drawing a point.
+    if (!positions.length && activeGenusItems?.length === 1) {
+      const location = activeGenusItems[0].location;
+      if (location?.lng != null && location?.lat != null) {
+        const lng = Number(location.lng), lat = Number(location.lat);
+        if (Number.isFinite(lng) && Number.isFinite(lat)) positions.push(Cesium.Cartesian3.fromDegrees(lng, lat));
+      }
+    }
     return positions;
   }
 
@@ -1580,7 +1589,7 @@
     if (!positions.length) return;
     const canvas = viewer.scene.canvas;
     const target = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
-      DOM.genusPanel?.offsetWidth || DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
+      DOM.genusPanel?.offsetWidth || DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum, 2);
     viewer.camera.cancelFlight();
     viewer.camera.flyTo({ ...target,
       duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS,
@@ -1633,7 +1642,7 @@
   // Fit all vertices in a north-up tangent frame, using only the unobscured width.
   // Move the camera east in the target tangent frame; keep a symmetric frustum.
   // Looking parallel to the target normal places it beside the panel without clipping render passes.
-  function speciesDestination(positions, width, height, panelWidth, frustum) {
+  function speciesDestination(positions, width, height, panelWidth, frustum, contextScale = 4) {
     const rectangle = Cesium.Rectangle.fromCartesianArray(positions);
     const centre = Cesium.Rectangle.center(rectangle);
     const frame = Cesium.Transforms.eastNorthUpToFixedFrame(
@@ -1646,8 +1655,7 @@
     const usableH = Math.max(20, height - 128);
     const tanY = Math.tan(frustum.fovy / 2);
     const tanX = tanY * frustum.aspectRatio;
-    // Keep the range around a quarter of the available span, like the reference.
-    const contextScale = 4;
+    // Species use 4x framing distance; genera use 2x for half the extra zoom-out.
     let altitude = CONFIG.ZOOM_IN_STOP_HEIGHT_M;
     for (const position of positions) {
       const local = Cesium.Matrix4.multiplyByPoint(inverse, position, new Cesium.Cartesian3());
