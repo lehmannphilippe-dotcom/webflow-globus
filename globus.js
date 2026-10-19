@@ -1387,6 +1387,7 @@
   let currentPrimaryPolygonDS = null;
   const rangeCache = new Map();
   let rangeLoadToken = 0;
+  let activeGenusItems = null;
 
   const rangePoints = viewer.scene.primitives.add(
     new Cesium.PointPrimitiveCollection()
@@ -1520,6 +1521,45 @@
     }
   }
 
+  // Genus panels show ordinary species markers plus only these two area layers.
+  async function showGenusMap(items) {
+    ++speciesFlightToken;
+    viewer.camera.cancelFlight();
+    activeGenusItems = items;
+    inDetailMode = true;
+    hideTooltip();
+    const selected = new Set(items);
+    for (let i = 0; i < points.length; i++) {
+      const point = points.get(i);
+      point.show = selected.has(point.id);
+    }
+    const cleared = hideRanges();
+    const loadToken = rangeLoadToken;
+    await cleared;
+    if (loadToken !== rangeLoadToken || activeView !== 'globe' || !speciesDesktop()) return;
+    const sources = new Map();
+    for (const item of items) for (const key of ['range_native', 'range_hypothetical']) {
+      const url = item.ranges?.[key];
+      if (url && !sources.has(url)) sources.set(url, key);
+    }
+    for (const [url, key] of sources) {
+      let ds = rangeCache.get(url);
+      if (!ds) {
+        try { ds = await Cesium.GeoJsonDataSource.load(url, { clampToGround: true }); }
+        catch (error) { console.warn('Gattungsfläche konnte nicht geladen werden', url, error); continue; }
+        rangeCache.set(url, ds);
+      }
+      if (loadToken !== rangeLoadToken) return;
+      if (!viewer.dataSources.contains(ds)) await viewer.dataSources.add(ds);
+      if (loadToken !== rangeLoadToken) {
+        if (!activeRangeDS.includes(ds) && viewer.dataSources.contains(ds)) viewer.dataSources.remove(ds, false);
+        return;
+      }
+      stylePolygonDataSource(ds, key);
+      activeRangeDS.push(ds);
+    }
+  }
+
   // One return view for the whole detail-panel session, including species changes.
   let speciesReturnView = null;
   let speciesFlightToken = 0;
@@ -1645,7 +1685,7 @@
 
   function scheduleSpeciesReframe() {
     clearTimeout(speciesResizeTimer);
-    if (!speciesReturnView || !document.body.classList.contains('panel-open')) return;
+    if (activeGenusItems !== null || !speciesReturnView || !document.body.classList.contains('panel-open')) return;
     speciesResizeTimer = setTimeout(() => {
       if (activeSpeciesItem) focusSpecies(activeSpeciesItem);
     }, 200);
@@ -2076,18 +2116,29 @@ function renderFamilyCards(speciesList = []) {
     DOM.genusPanel?.classList.remove("is-open");
   }
 
-  function finalizeSecondaryPanel(panelEl, cardsEl) {
+  function finalizeSecondaryPanel(panelEl, cardsEl, genusItems = []) {
     closeSecondaryPanels();
     resetPanelScroll(panelEl);
     if (cardsEl) cardsEl.scrollLeft = 0;
     panelEl?.classList.add("is-open");
     setPanelOpen(true);
     updateCardRailTitleLayout(cardsEl);
+    if (panelEl === DOM.genusPanel) {
+      void showGenusMap(genusItems).catch(error => console.warn('Gattungsansicht konnte nicht geladen werden', error));
+    } else {
+      activeGenusItems = null;
+      ++speciesFlightToken;
+      viewer.camera.cancelFlight();
+      void hideRanges();
+      inDetailMode = false;
+      setAllPointsVisible(true);
+    }
   }
 
   async function openSpeciesFromCard(item) {
     if (!item) return;
 
+    activeGenusItems = null;
     rememberSpeciesView();
     closeSecondaryPanels();
     hideTooltip();
@@ -2122,7 +2173,7 @@ function renderFamilyCards(speciesList = []) {
 
     fillGenusPanel(genusItem, speciesInGenus);
     renderGenusCards(speciesInGenus);
-    finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
+    finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards, speciesInGenus);
   }
 
   function openGenusPanelFromSpecies(speciesItem) {
@@ -2254,13 +2305,23 @@ function renderFamilyCards(speciesList = []) {
     }
   }
 
+  function speciesMarkerStyle(item) {
+    const isForm = /\bsp\./i.test(item?.name?.lat || '');
+    return {
+      // Centre a 2 px outline on the normal marker's circle: 6 px fill + 4 px stroke.
+      pixelSize: isForm ? Math.max(1, CONFIG.POINT_SIZE - 2) : CONFIG.POINT_SIZE,
+      color: Cesium.Color.fromCssColorString(isForm ? '#1F2552' : CONFIG.POINT_COLOR),
+      outlineColor: Cesium.Color.fromCssColorString(CONFIG.POINT_COLOR),
+      outlineWidth: isForm ? 2 : 0
+    };
+  }
+
   function addAllPoints() {
     for (const d of ALL) {
       if (d.location.lat == null || d.location.lng == null) continue;
       const p = points.add({
         position: Cesium.Cartesian3.fromDegrees(d.location.lng, d.location.lat),
-        pixelSize: CONFIG.POINT_SIZE,
-        color: Cesium.Color.fromCssColorString(CONFIG.POINT_COLOR),
+        ...speciesMarkerStyle(d),
         show: !introActive
       });
       p.id = d;
@@ -2268,6 +2329,7 @@ function renderFamilyCards(speciesList = []) {
   }
 
   async function restoreDefaultState() {
+    activeGenusItems = null;
     await hideRanges();
     inDetailMode = false;
     setAllPointsVisible(true);
@@ -2960,7 +3022,7 @@ function renderFamilyCards(speciesList = []) {
         if (entry.type === 'genus') {
           fillGenusPanel(entry.item, entry.species);
           renderGenusCards(entry.species);
-          finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards);
+          finalizeSecondaryPanel(DOM.genusPanel, DOM.genusCards, entry.species);
         } else {
           fillFamilyPanel(entry.item, entry.species);
           renderFamilyCards(entry.species);
