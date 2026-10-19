@@ -1589,7 +1589,7 @@
     if (!positions.length) return;
     const canvas = viewer.scene.canvas;
     const target = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
-      DOM.genusPanel?.offsetWidth || DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum, 2);
+      DOM.genusPanel?.offsetWidth || DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum, 1.2);
     viewer.camera.cancelFlight();
     viewer.camera.flyTo({ ...target,
       duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS,
@@ -1655,7 +1655,7 @@
     const usableH = Math.max(20, height - 128);
     const tanY = Math.tan(frustum.fovy / 2);
     const tanX = tanY * frustum.aspectRatio;
-    // Species use 4x framing distance; genera use 2x for half the extra zoom-out.
+    // Species use 4x framing distance; genera use 1.2x for a close fit.
     let altitude = CONFIG.ZOOM_IN_STOP_HEIGHT_M;
     for (const position of positions) {
       const local = Cesium.Matrix4.multiplyByPoint(inverse, position, new Cesium.Cartesian3());
