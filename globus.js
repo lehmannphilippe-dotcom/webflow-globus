@@ -1579,6 +1579,9 @@
   }
 
   async function hideRanges() {
+    resetGenusMarkerHover(true);
+    viewer.scene.canvas.style.cursor = '';
+    document.body.classList.remove('genus-marker-interaction');
     hideRangeHover(true);
     rangeHoverTargets = new WeakMap();
     document.body.classList.remove('range-hover-enabled');
@@ -1693,6 +1696,7 @@
     const loadToken = rangeLoadToken;
     await cleared;
     if (loadToken !== rangeLoadToken || activeView !== 'globe' || !speciesDesktop()) return;
+    document.body.classList.toggle('genus-marker-interaction', items.length > 1);
     const sources = new Map();
     for (const item of items) for (const key of ['range_native', 'range_hypothetical']) {
       const url = item.ranges?.[key];
@@ -2017,7 +2021,7 @@
     DOM.tip.style.transform = "translateY(6px)";
   }
 
-  function showTooltip(item) {
+  function showTooltip(item, rightEdge = innerWidth) {
     if (!DOM.tip || !item) return;
 
    preloadPanelImageForItem(item);
@@ -2030,8 +2034,9 @@
     const w = DOM.tip.offsetWidth || 320;
     const h = DOM.tip.offsetHeight || 180;
 
-    DOM.tip.style.left =
-      U.clamp(pointer.x + 14, 12, innerWidth - w - 12) + "px";
+    const x = rightEdge < innerWidth && pointer.x + 14 + w > rightEdge - 12
+      ? pointer.x - w - 14 : pointer.x + 14;
+    DOM.tip.style.left = U.clamp(x, 12, Math.max(12, rightEdge - w - 12)) + 'px';
     DOM.tip.style.top =
       U.clamp(pointer.y + 14, 12, innerHeight - h - 12) + "px";
     DOM.tip.style.opacity = "1";
@@ -2330,6 +2335,8 @@ function renderFamilyCards(speciesList = []) {
   async function openSpeciesFromCard(item) {
     if (!item) return;
 
+    resetGenusMarkerHover(true);
+    viewer.scene.canvas.style.cursor = '';
     activeGenusItems = null;
     rememberSpeciesView();
     closeSecondaryPanels();
@@ -2490,6 +2497,88 @@ function renderFamilyCards(speciesList = []) {
   );
   const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 
+  // Genus markers reuse the original Webflow species tooltip and species action.
+  let hoveredGenusMarker = null;
+  const genusMarkerSizes = new WeakMap();
+  const genusMarkerAnimations = new Map();
+
+  function animateGenusMarker(point, grow, immediate = false) {
+    if (!point) return;
+    if (!genusMarkerSizes.has(point)) genusMarkerSizes.set(point, point.pixelSize);
+    const base = genusMarkerSizes.get(point);
+    cancelAnimationFrame(genusMarkerAnimations.get(point));
+    genusMarkerAnimations.delete(point);
+    const target = base * (grow ? 1.5 : 1);
+    if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      point.pixelSize = target;
+      viewer.scene.requestRender?.();
+      return;
+    }
+    const from = point.pixelSize, started = performance.now();
+    const tick = () => {
+      const p = Math.min(1, (performance.now() - started) / 150);
+      point.pixelSize = from + (target - from) * (1 - (1 - p) ** 3);
+      viewer.scene.requestRender?.();
+      if (p < 1) genusMarkerAnimations.set(point, requestAnimationFrame(tick));
+      else genusMarkerAnimations.delete(point);
+    };
+    tick();
+  }
+
+  function resetGenusMarkerHover(immediate = false) {
+    animateGenusMarker(hoveredGenusMarker, false, immediate);
+    hoveredGenusMarker = null;
+    if (immediate) {
+      for (const [point, raf] of genusMarkerAnimations) {
+        cancelAnimationFrame(raf);
+        point.pixelSize = genusMarkerSizes.get(point);
+      }
+      genusMarkerAnimations.clear();
+    }
+  }
+
+  function canUseGenusMarkers() {
+    return activeView === 'globe' && speciesDesktop() && activeGenusItems !== null
+      && activeGenusItems.length > 1 && document.body.classList.contains('panel-open')
+      && !introActive && !hawaiiFlightActive && !hawaiiFlightPending;
+  }
+
+  function pickGenusMarker(position) {
+    if (!canUseGenusMarkers()) return null;
+    // A polygon can be above the point in the pick stack: search all visible hits.
+    for (const picked of viewer.scene.drillPick(position, 12)) {
+      const point = picked.primitive;
+      if (point?.show && point.id && activeGenusItems.includes(point.id)) return point;
+    }
+    return null;
+  }
+
+  function updateGenusMarkerHover(position) {
+    const point = pickGenusMarker(position);
+    if (!point) {
+      resetGenusMarkerHover();
+      hideTooltip();
+      viewer.scene.canvas.style.cursor = '';
+      return;
+    }
+    if (hoveredGenusMarker !== point) {
+      animateGenusMarker(hoveredGenusMarker, false);
+      hoveredGenusMarker = point;
+      animateGenusMarker(point, true);
+    }
+    const canvas = viewer.scene.canvas.getBoundingClientRect();
+    pointer.x = canvas.left + position.x;
+    pointer.y = canvas.top + position.y;
+    showTooltip(point.id, Math.min(innerWidth, canvas.right - (DOM.genusPanel?.offsetWidth || 0)));
+    viewer.scene.canvas.style.cursor = 'pointer';
+  }
+
+  DOM.globeHost.addEventListener('pointerleave', () => {
+    resetGenusMarkerHover();
+    hideTooltip();
+    viewer.scene.canvas.style.cursor = '';
+  });
+
   function setAllPointsVisible(visible) {
     for (let i = 0; i < points.length; i++) {
       const pt = points.get(i);
@@ -2532,6 +2621,12 @@ function renderFamilyCards(speciesList = []) {
     (m) => {
       if (activeView !== 'globe') { hideRangeHover(true); return; }
       if (document.body.classList.contains('panel-open')) {
+        if (activeGenusItems !== null) {
+          hideRangeHover(true);
+          updateGenusMarkerHover(m.endPosition);
+          return;
+        }
+        resetGenusMarkerHover(true);
         hideTooltip();
         updateRangeHover(m.endPosition);
         return;
@@ -2551,7 +2646,11 @@ function renderFamilyCards(speciesList = []) {
 
   handler.setInputAction(
     async (c) => {
-      if (activeView !== 'globe' || introActive || hawaiiFlightActive || hawaiiFlightPending) return;
+      if (introActive || hawaiiFlightActive || hawaiiFlightPending) return;
+      if (activeGenusItems !== null) {
+        const point = pickGenusMarker(c.position);
+        if (point) { await openSpeciesFromCard(point.id); return; }
+      }
       const picked = viewer.scene.pick(c.position);
       // Hover targets are not species selections and do not close the art panel.
       if (resolveRangeHover(picked)) return;
