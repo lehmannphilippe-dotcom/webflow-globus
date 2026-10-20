@@ -1442,6 +1442,9 @@ body.panel-open #globe { transform: none; }
   border-radius: 50%;
   overflow: hidden;
   pointer-events: none;
+  opacity: 0;
+  transform: scale(.08);
+  transform-origin: center;
 }
 #genus-card-map-image[hidden] { display: none; }
 #genus-card-map-image > * {
@@ -1457,6 +1460,18 @@ body.panel-open #globe { transform: none; }
   background-size: cover;
 }
 @media (max-width: 860px) { #genus-card-map-image { display: none; } }
+
+#genus-card-map-image.is-entering {
+  animation: genus-card-image-pop 220ms cubic-bezier(.2, .8, .25, 1) both;
+}
+@keyframes genus-card-image-pop {
+  0% { opacity: 0; transform: scale(.08); }
+  70% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #genus-card-map-image.is-entering { animation: none; opacity: 1; transform: none; }
+}
 
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
