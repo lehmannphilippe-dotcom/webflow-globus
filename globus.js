@@ -2655,6 +2655,7 @@ function renderFamilyCards(speciesList = []) {
     }
     hoveredGenusCard = { card, item, point };
     const request = ++genusCardImageRequest;
+    genusCardMapImage.classList.remove('is-entering');
     genusCardMapAvatar.style.visibility = 'hidden';
     updateGenusCardMapImage();
     const src = item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG;
@@ -2662,6 +2663,10 @@ function renderFamilyCards(speciesList = []) {
       if (request !== genusCardImageRequest || hoveredGenusCard?.card !== card) return;
       U.setWFImage(genusCardMapAvatar, url);
       genusCardMapAvatar.style.visibility = '';
+      // Restart only when this card's image is ready, never on camera updates.
+      genusCardMapImage.classList.remove('is-entering');
+      void genusCardMapImage.offsetWidth;
+      genusCardMapImage.classList.add('is-entering');
     };
     preloadImage(src).then(() => setImage(src)).catch(() => setImage(CONFIG.DEFAULT_TOOLTIP_IMG));
   }
