@@ -1579,6 +1579,7 @@
   }
 
   async function hideRanges() {
+    hideGenusCardMapImage(null, true);
     resetGenusMarkerHover(true);
     viewer.scene.canvas.style.cursor = '';
     document.body.classList.remove('genus-marker-interaction');
@@ -2206,7 +2207,10 @@
 
     for (const item of [...speciesList].sort(compareSpeciesAlpha)) {
       const card = buildSpeciesCard(item);
-      if (card) container.appendChild(card);
+      if (card) {
+        bindGenusCardMapHover(card, item);
+        container.appendChild(card);
+      }
     }
   }
    function updateFamilyGenusStickyTracks(container = DOM.familyCards) {
@@ -2335,6 +2339,7 @@ function renderFamilyCards(speciesList = []) {
   async function openSpeciesFromCard(item) {
     if (!item) return;
 
+    hideGenusCardMapImage(null, true);
     resetGenusMarkerHover(true);
     viewer.scene.canvas.style.cursor = '';
     activeGenusItems = null;
@@ -2554,6 +2559,7 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function updateGenusMarkerHover(position) {
+    hideGenusCardMapImage();
     const point = pickGenusMarker(position);
     if (!point) {
       resetGenusMarkerHover();
@@ -2578,6 +2584,99 @@ function renderFamilyCards(speciesList = []) {
     hideTooltip();
     viewer.scene.canvas.style.cursor = '';
   });
+
+  // Hovering a genus card highlights its marker with only the original tooltip avatar.
+  let hoveredGenusCard = null;
+  let genusCardMapImage = null;
+  let genusCardMapAvatar = null;
+  let genusCardImageRequest = 0;
+  const genusCardOccluder = new Cesium.EllipsoidalOccluder(Cesium.Ellipsoid.WGS84);
+
+  function hideGenusCardMapImage(card = null, immediate = false) {
+    if (!hoveredGenusCard || (card && hoveredGenusCard.card !== card)) return;
+    hoveredGenusCard = null;
+    ++genusCardImageRequest;
+    if (genusCardMapImage) genusCardMapImage.hidden = true;
+    resetGenusMarkerHover(immediate);
+  }
+
+  function updateGenusCardMapImage() {
+    if (!hoveredGenusCard || !genusCardMapImage) return;
+    const { card, point } = hoveredGenusCard;
+    if (!canUseGenusMarkers() || !card.isConnected || !point.show) {
+      hideGenusCardMapImage(null, true);
+      return;
+    }
+    genusCardOccluder.cameraPosition = viewer.camera.positionWC;
+    const screen = Cesium.SceneTransforms.worldToWindowCoordinates(viewer.scene, point.position);
+    const canvas = viewer.scene.canvas.getBoundingClientRect();
+    const right = Math.min(innerWidth, canvas.right - (DOM.genusPanel?.offsetWidth || 0)) - 12;
+    const left = Math.max(12, canvas.left + 12), top = Math.max(64, canvas.top + 12);
+    const bottom = Math.min(innerHeight - 12, canvas.bottom - 12);
+    const x = canvas.left + (screen?.x ?? -Infinity), y = canvas.top + (screen?.y ?? -Infinity);
+    if (!screen || !genusCardOccluder.isPointVisible(point.position) || x < left || x > right || y < top || y > bottom) {
+      genusCardMapImage.hidden = true;
+      return;
+    }
+    const width = genusCardMapImage.offsetWidth || 100;
+    const height = genusCardMapImage.offsetHeight || width;
+    const px = x + 14 + width <= right ? x + 14 : x - width - 14;
+    genusCardMapImage.style.left = `${Math.max(left, Math.min(px, right - width))}px`;
+    genusCardMapImage.style.top = `${Math.max(top, Math.min(y - height + 20, bottom - height))}px`;
+    genusCardMapImage.hidden = false;
+  }
+
+  function showGenusCardMapImage(card, item) {
+    if (!canUseGenusMarkers() || !DOM.genusCards?.contains(card) || !DOM.tipImg) return;
+    let point = null;
+    for (let i = 0; i < points.length; i++) {
+      const candidate = points.get(i);
+      if (candidate.show && candidate.id === item) { point = candidate; break; }
+    }
+    if (!point) return;
+    if (!genusCardMapImage) {
+      genusCardMapImage = document.createElement('div');
+      genusCardMapImage.id = 'genus-card-map-image';
+      genusCardMapImage.hidden = true;
+      genusCardMapImage.setAttribute('aria-hidden', 'true');
+      genusCardMapAvatar = DOM.tipImg.cloneNode(true);
+      for (const element of [genusCardMapAvatar, ...genusCardMapAvatar.querySelectorAll('[id]')]) element.removeAttribute('id');
+      genusCardMapImage.appendChild(genusCardMapAvatar);
+      document.body.appendChild(genusCardMapImage);
+    }
+    const size = DOM.tipImg.offsetWidth || 100;
+    genusCardMapImage.style.width = `${size}px`;
+    genusCardMapImage.style.height = `${size}px`;
+    hideTooltip();
+    if (hoveredGenusMarker !== point) {
+      animateGenusMarker(hoveredGenusMarker, false);
+      hoveredGenusMarker = point;
+      animateGenusMarker(point, true);
+    }
+    hoveredGenusCard = { card, item, point };
+    const request = ++genusCardImageRequest;
+    genusCardMapAvatar.style.visibility = 'hidden';
+    updateGenusCardMapImage();
+    const src = item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG;
+    const setImage = url => {
+      if (request !== genusCardImageRequest || hoveredGenusCard?.card !== card) return;
+      U.setWFImage(genusCardMapAvatar, url);
+      genusCardMapAvatar.style.visibility = '';
+    };
+    preloadImage(src).then(() => setImage(src)).catch(() => setImage(CONFIG.DEFAULT_TOOLTIP_IMG));
+  }
+
+  function bindGenusCardMapHover(card, item) {
+    card.addEventListener('pointerenter', () => showGenusCardMapImage(card, item));
+    card.addEventListener('pointerleave', () => hideGenusCardMapImage(card));
+    card.addEventListener('focusin', () => showGenusCardMapImage(card, item));
+    card.addEventListener('focusout', event => {
+      if (!card.contains(event.relatedTarget)) hideGenusCardMapImage(card);
+    });
+  }
+
+  // Keep the avatar attached to its geographic marker during camera flights.
+  viewer.scene.postRender.addEventListener(updateGenusCardMapImage);
 
   function setAllPointsVisible(visible) {
     for (let i = 0; i < points.length; i++) {
