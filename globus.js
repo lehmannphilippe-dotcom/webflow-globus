@@ -2016,8 +2016,12 @@
     { passive: true }
   );
 
+  let visibleTooltipItem = null;
+
   function hideTooltip() {
+    visibleTooltipItem = null;
     if (!DOM.tip) return;
+    DOM.tip.classList.remove("is-hover-entering");
     DOM.tip.style.opacity = "0";
     DOM.tip.style.transform = "translateY(6px)";
   }
@@ -2042,6 +2046,13 @@
       U.clamp(pointer.y + 14, 12, innerHeight - h - 12) + "px";
     DOM.tip.style.opacity = "1";
     DOM.tip.style.transform = "translateY(0)";
+    // Object identity also distinguishes forms that share a JSON ID.
+    if (visibleTooltipItem !== item) {
+      visibleTooltipItem = item;
+      DOM.tip.classList.remove("is-hover-entering");
+      void DOM.tip.offsetWidth;
+      DOM.tip.classList.add("is-hover-entering");
+    }
   }
 
   hideTooltip();
