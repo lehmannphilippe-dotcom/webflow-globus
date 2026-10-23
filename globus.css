@@ -1546,14 +1546,19 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
 #species-browser .gbv-count { color: inherit; font: 400 18px/24px Inter, sans-serif; }
 #species-browser .gbv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: stretch; }
 #species-browser .gbv-card { display: flex !important; flex-direction: column !important; position: relative; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; align-self: stretch !important; box-sizing: border-box !important; flex: none !important; cursor: pointer; }
-/* Replays on opening the overview and on insertion after a new sort. */
-body.globe-cards-view #species-browser .gbv-card {
-  animation: gbv-card-enter 1200ms ease-out both;
+/* Observe unscaled card boxes; transforms never change the uniform grid layout. */
+#species-browser .gbv-card.is-reveal-pending { opacity: 0; }
+body.globe-cards-view #species-browser .gbv-card.is-revealed {
+  transform-origin: 50% 50%;
+  animation-name: gbv-hapi-scale, gbv-hapi-opacity;
+  animation-duration: var(--gbv-reveal-duration, 600ms);
+  animation-delay: var(--gbv-reveal-delay, 0ms);
+  animation-timing-function: cubic-bezier(.19, 1, .22, 1), linear;
+  animation-fill-mode: both;
 }
-@keyframes gbv-card-enter {
-  from { opacity: 0; transform: translateY(80px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+@keyframes gbv-hapi-scale { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes gbv-hapi-opacity { from { opacity: 0; } to { opacity: 1; } }
+#species-browser .gbv-card:focus-visible { opacity: 1; animation: none; }
 #species-browser .gbv-card .card-image { width: 100% !important; max-width: 100% !important; height: auto !important; aspect-ratio: 1; flex: 0 0 auto !important; }
 #species-browser .gbv-card .card-body { width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; flex: 1 1 auto !important; }
 #species-browser .gbv-card .card-name-de, #species-browser .gbv-card .card-name-lat, #species-browser .gbv-card .card-habitat { height: auto !important; max-height: none !important; white-space: normal !important; overflow-wrap: anywhere; }
@@ -1580,7 +1585,7 @@ body.globe-cards-view #species-browser .gbv-card {
 }
 @media (max-width: 540px) { #species-browser .gbv-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) {
-  body.globe-cards-view #species-browser .gbv-card { animation: none; }
+  body.globe-cards-view #species-browser .gbv-card { animation: none; opacity: 1; transform: none; }
   #species-browser, #species-browser .gbv-content, #species-browser .gbv-sort, #species-browser .gbv-options, #species-browser .gbv-options button, #species-browser .gbv-chevron { transition: none; }
   #species-browser .gbv-content, #species-browser .gbv-options { transform: none; }
 }
