@@ -2016,12 +2016,8 @@
     { passive: true }
   );
 
-  let visibleTooltipItem = null;
-
   function hideTooltip() {
-    visibleTooltipItem = null;
     if (!DOM.tip) return;
-    DOM.tip.classList.remove("is-hover-entering");
     DOM.tip.style.opacity = "0";
     DOM.tip.style.transform = "translateY(6px)";
   }
@@ -2046,13 +2042,7 @@
       U.clamp(pointer.y + 14, 12, innerHeight - h - 12) + "px";
     DOM.tip.style.opacity = "1";
     DOM.tip.style.transform = "translateY(0)";
-    // Object identity also distinguishes forms that share a JSON ID.
-    if (visibleTooltipItem !== item) {
-      visibleTooltipItem = item;
-      DOM.tip.classList.remove("is-hover-entering");
-      void DOM.tip.offsetWidth;
-      DOM.tip.classList.add("is-hover-entering");
-    }
+
   }
 
   hideTooltip();
@@ -2951,6 +2941,56 @@ function renderFamilyCards(speciesList = []) {
     }, { root: overview, rootMargin: '500px 0px' });
   }
 
+  // Codrops Hapi: scale from the centre + linear opacity, staggered per viewport batch.
+  let overviewRevealObserver = null;
+  let overviewRevealFrame = 0;
+  const overviewRevealQueue = new Set();
+
+  function stopOverviewCardReveal() {
+    overviewRevealObserver?.disconnect();
+    overviewRevealObserver = null;
+    cancelAnimationFrame(overviewRevealFrame);
+    overviewRevealFrame = 0;
+    overviewRevealQueue.clear();
+  }
+
+  function revealOverviewCards() {
+    overviewRevealFrame = 0;
+    if (activeView !== 'cards') { overviewRevealQueue.clear(); return; }
+    const cards = [...overviewContent.querySelectorAll('.gbv-card')]
+      .filter((card) => overviewRevealQueue.has(card));
+    overviewRevealQueue.clear();
+    cards.forEach((card, index) => {
+      card.style.setProperty('--gbv-reveal-delay', `${index * 50}ms`);
+      card.style.setProperty('--gbv-reveal-duration', `${600 + index * 75}ms`);
+      card.classList.remove('is-reveal-pending');
+      card.classList.add('is-revealed');
+    });
+  }
+
+  function startOverviewCardReveal() {
+    stopOverviewCardReveal();
+    const cards = overviewContent.querySelectorAll('.gbv-card');
+    const immediate = overviewReducedMotion() || !('IntersectionObserver' in window);
+    if (!immediate) {
+      overviewRevealObserver = new IntersectionObserver((entries) => {
+        if (activeView !== 'cards') return;
+        for (const entry of entries) if (entry.isIntersecting) {
+          overviewRevealObserver.unobserve(entry.target);
+          overviewRevealQueue.add(entry.target);
+        }
+        if (overviewRevealQueue.size && !overviewRevealFrame) {
+          overviewRevealFrame = requestAnimationFrame(revealOverviewCards);
+        }
+      }, { root: overview, threshold: 0.01 });
+    }
+    cards.forEach((card) => {
+      card.classList.remove('is-revealed');
+      card.classList.toggle('is-reveal-pending', !immediate);
+      if (!immediate) overviewRevealObserver.observe(card);
+    });
+  }
+
   function setOverviewMenu(open, focusOption = false) {
     overviewMenuOpen = open;
     overviewOptions.toggleAttribute('inert', !open);
@@ -3016,6 +3056,7 @@ function renderFamilyCards(speciesList = []) {
     if (animate && overviewRenderedSort !== null) { overviewContent.classList.add('is-changing'); await overviewWait(125); }
     if (token !== overviewRenderToken || activeView !== 'cards') return;
     overviewImageObserver?.disconnect();
+    stopOverviewCardReveal();
     const groups = overviewGroups(ALL, overviewSort);
     const styles = snapshotSearchTooltipStyles(DOM.speciesCardTemplate);
     const fragment = document.createDocumentFragment();
@@ -3036,7 +3077,10 @@ function renderFamilyCards(speciesList = []) {
       const grid = document.createElement('div'); grid.className = 'gbv-grid';
       for (const item of group.items) {
         const card = makeOverviewCard(item, styles);
-        if (card) grid.appendChild(card);
+        if (card) {
+          if (!overviewReducedMotion() && 'IntersectionObserver' in window) card.classList.add('is-reveal-pending');
+          grid.appendChild(card);
+        }
         if (++built % 48 === 0) {
           await new Promise(requestAnimationFrame);
           if (token !== overviewRenderToken || activeView !== 'cards') return;
@@ -3073,7 +3117,7 @@ function renderFamilyCards(speciesList = []) {
     overviewStatus.classList.add('is-sr-only');
     overviewContent.setAttribute('aria-busy', 'false');
     requestAnimationFrame(() => {
-      if (token === overviewRenderToken) { overviewContent.classList.remove('is-changing'); updateOverviewAlphabet(); }
+      if (token === overviewRenderToken && activeView === 'cards') { overviewContent.classList.remove('is-changing'); updateOverviewAlphabet(); startOverviewCardReveal(); }
     });
   }
 
@@ -3124,11 +3168,13 @@ function renderFamilyCards(speciesList = []) {
       document.body.classList.add('globe-cards-view');
       overview.removeAttribute('inert'); overview.setAttribute('aria-hidden', 'false');
       if (overviewRenderedSort !== overviewSort || overviewContent.getAttribute('aria-busy') === 'true') await renderOverview(false, true);
+      else startOverviewCardReveal();
       overviewContent.querySelectorAll('.card-image').forEach((image) => {
         if (overviewImageSources.has(image)) overviewImageObserver?.observe(image);
       });
     } else {
       activeView = 'globe';
+      stopOverviewCardReveal();
       updateOverviewTabs(next);
       ++overviewRenderToken;
       document.body.classList.remove('globe-cards-view');
