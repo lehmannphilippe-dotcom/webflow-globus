@@ -1476,12 +1476,45 @@ body.panel-open #globe { transform: none; }
 
 
 
+/* Shared behaviour for the original Webflow cards in overview, genus and family. */
+.globe-species-card {
+  background-color: #10225c !important;
+  transition: background-color 300ms ease-out;
+}
+.globe-species-card .card-body {
+  background-color: #10225c !important;
+  transition: background-color 300ms ease-out;
+}
+.globe-species-card .card-image,
+.globe-species-card:hover .card-image,
+.globe-species-card:focus-within .card-image {
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  background-blend-mode: normal !important;
+}
+.globe-species-card .card-image::before,
+.globe-species-card .card-image::after {
+  content: none !important;
+}
+@media (hover: hover) {
+  .globe-species-card:hover,
+  .globe-species-card:hover .card-body { background-color: #404d7e !important; }
+}
+.globe-species-card:focus-within,
+.globe-species-card:focus-within .card-body { background-color: #404d7e !important; }
+@media (prefers-reduced-motion: reduce) {
+  .globe-species-card, .globe-species-card .card-body { transition: none; }
+}
+
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
   --gbv-arrow: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJrZXlib2FyZF9hcnJvd19kb3duXzI0ZHBfRTNFM0UzX0ZJTEwwX3dnaHQ0MDBfR1JBRDBfb3BzejI0IDEiPgo8cGF0aCBpZD0iVmVjdG9yIiBkPSJNMTIgMTUuNEw2IDkuNEw3LjQgOEwxMiAxMi42TDE2LjYgOEwxOCA5LjRMMTIgMTUuNFoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L3N2Zz4K");
   --gbv-inset-left: 16px;
   --gbv-inset-right: 16px;
   --gbv-header-depth: 96px;
+  --gbv-toolbar-top: 64px;
+  --gbv-heading-top: calc(var(--gbv-toolbar-top) + 16px);
   position: fixed;
   inset: 0;
   z-index: 5;
@@ -1502,7 +1535,7 @@ body.panel-open #globe { transform: none; }
 body.globe-cards-view #species-browser { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
 body.globe-cards-view #globe { opacity: 0 !important; pointer-events: none !important; }
 body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
-#species-browser .gbv-toolbar { display: flex; flex-direction: column; align-items: center; gap: 0; position: sticky; top: 64px; z-index: 3; background: #04052a; padding-bottom: 10px; margin: 96px 0 0; }
+#species-browser .gbv-toolbar { display: flex; flex-direction: column; align-items: center; gap: 0; position: sticky; top: var(--gbv-toolbar-top); z-index: 3; background: #04052a; padding-bottom: 10px; margin: 96px 0 0; }
 /* Opaque band extends from the sticky sort toolbar through the whole header. */
 #species-browser .gbv-toolbar::before {
   content: "";
@@ -1539,10 +1572,21 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
 @media (hover: hover) {
   #species-browser .gbv-sort:hover, #species-browser .gbv-options button:hover { background: #3f4c80; }
 }
-#species-browser .gbv-content { opacity: 1; transform: translateY(0); transition: opacity 125ms ease-out, transform 125ms ease-out; }
+#species-browser .gbv-content { margin-top: -60px; opacity: 1; transform: none; transition: opacity 125ms ease-out, transform 125ms ease-out; }
 #species-browser .gbv-content.is-changing { opacity: 0; transform: translateY(6px); }
 #species-browser .gbv-group { margin: 0 0 13px; scroll-margin-top: 78px; }
 #species-browser .gbv-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 0 0 13px; color: #fff; font: 700 50px/1 Inter, sans-serif; overflow-wrap: anywhere; }
+/* Native sticky stays bounded by its section and is pushed out by the next group. */
+#species-browser .gbv-heading {
+  position: sticky;
+  top: var(--gbv-heading-top);
+  z-index: 4;
+  clip-path: inset(var(--gbv-title-clip, 0px) -4px 0 -4px);
+  width: max-content;
+  max-width: calc(50% - 145px);
+  box-sizing: border-box;
+  background: #04052a;
+}
 #species-browser .gbv-count { color: inherit; font: 400 18px/24px Inter, sans-serif; }
 #species-browser .gbv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: stretch; }
 #species-browser .gbv-card { display: flex !important; flex-direction: column !important; position: relative; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; align-self: stretch !important; box-sizing: border-box !important; flex: none !important; cursor: pointer; }
@@ -1572,11 +1616,13 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
 #species-browser .gbv-alphabet button:focus-visible { outline: 1px solid #ff5100; border-radius: 3px; }
 #species-browser .gbv-status { color: #7da1da; font: 400 16px/24px Inter, sans-serif; }
 #species-browser .is-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@media (max-width: 1100px) and (min-width: 861px) { #species-browser { --gbv-header-depth: 124px; } #species-browser .gbv-toolbar { margin-top: 124px; top: 116px; } }
+@media (max-width: 1100px) and (min-width: 861px) { #species-browser { --gbv-header-depth: 124px; --gbv-toolbar-top: 116px; } #species-browser .gbv-toolbar { margin-top: 124px; } }
 @media (max-width: 860px) {
   #species-browser { --gbv-inset-left: 12px; --gbv-inset-right: 12px; --gbv-header-depth: 88px; padding: 0 12px max(40px, env(safe-area-inset-bottom, 0px)); }
   #species-browser .gbv-toolbar { margin-top: 88px; }
-  #species-browser .gbv-heading { font-size: 34px; line-height: 1.1; gap: 6px; }
+  #species-browser { --gbv-heading-top: calc(var(--gbv-toolbar-top) + 76px); }
+  #species-browser .gbv-content { margin-top: 0; }
+  #species-browser .gbv-heading { width: 100%; max-width: none; font-size: 34px; line-height: 1.1; gap: 6px; }
   #species-browser .gbv-count { font-size: 14px; line-height: 20px; }
   #species-browser .gbv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #species-browser.has-alphabet { --gbv-inset-right: 34px; padding-right: 34px; }
@@ -1589,3 +1635,6 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
   #species-browser, #species-browser .gbv-content, #species-browser .gbv-sort, #species-browser .gbv-options, #species-browser .gbv-options button, #species-browser .gbv-chevron { transition: none; }
   #species-browser .gbv-content, #species-browser .gbv-options { transform: none; }
 }
+
+/* Keep the open sort menu above sticky headings on narrow screens. */
+#species-browser.is-sort-open .gbv-toolbar { z-index: 6; }
