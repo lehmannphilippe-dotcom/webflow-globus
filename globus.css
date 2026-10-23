@@ -1419,8 +1419,9 @@ body.panel-open #globe { transform: none; }
   pointer-events: auto;
 }
 #range-hover-popup[hidden] { display: none; }
-#range-hover-popup .rh-title { margin: 0; color: var(--rh-color); font: 700 16px/20px Inter, sans-serif; }
-#range-hover-popup .rh-text { margin: 0; color: #7da1da; font: 400 14px/18px Inter, sans-serif; white-space: pre-line; }
+#range-hover-popup .rh-title { margin: 0; color: var(--rh-color); font: 700 16px/22px Inter, sans-serif; }
+#range-hover-popup .rh-title:not([hidden]) + .rh-text:not([hidden]) { margin-top: 4px; }
+#range-hover-popup .rh-text { margin: 0; color: #7da1da; font: 400 14px/22px Inter, sans-serif; white-space: pre-line; }
 @media (max-width: 860px) { #range-hover-popup { display: none; } }
 /* Let Cesium receive pointer movement through the otherwise blocking backdrop. */
 @media (min-width: 861px) {
@@ -1473,15 +1474,7 @@ body.panel-open #globe { transform: none; }
   #genus-card-map-image.is-entering { animation: none; opacity: 1; transform: none; }
 }
 
-/* Animate the original Webflow tooltip in both globe and genus marker views. */
-#species-tooltip.is-hover-entering {
-  transform-origin: top left;
-  transition: none;
-  animation: genus-card-image-pop 220ms cubic-bezier(.2, .8, .25, 1) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  #species-tooltip.is-hover-entering { animation: none; }
-}
+
 
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
