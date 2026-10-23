@@ -2160,6 +2160,7 @@
     if (!template || !item) return null;
 
     const card = template.cloneNode(true);
+    card.classList.add("globe-species-card");
     card.removeAttribute("id");
     card.style.display = "";
     card.removeAttribute("aria-hidden");
@@ -2993,6 +2994,7 @@ function renderFamilyCards(speciesList = []) {
 
   function setOverviewMenu(open, focusOption = false) {
     overviewMenuOpen = open;
+    overview.classList.toggle("is-sort-open", open);
     overviewOptions.toggleAttribute('inert', !open);
     overviewOptions.classList.toggle('is-open', open);
     overviewSortButton.setAttribute('aria-expanded', String(open));
@@ -3121,12 +3123,29 @@ function renderFamilyCards(speciesList = []) {
     });
   }
 
+  function overviewHeadingOffset() {
+    const heading = overviewContent.querySelector('.gbv-heading');
+    return heading ? parseFloat(getComputedStyle(heading).top) || 0 : 0;
+  }
+
+  function updateOverviewStickyHeadings() {
+    const stickyTop = overview.getBoundingClientRect().top + overviewHeadingOffset();
+    for (const group of overviewGroupsOnScreen) {
+      const heading = group.section.querySelector('.gbv-heading');
+      if (!heading) continue;
+      // Clip a departing sticky title at the header edge, keeping the logo clear.
+      const clipped = Math.max(0, stickyTop - heading.getBoundingClientRect().top);
+      heading.style.setProperty('--gbv-title-clip', `${clipped}px`);
+    }
+  }
+
   function updateOverviewAlphabet() {
     overviewScrollFrame = 0;
+    updateOverviewStickyHeadings();
     if (overviewAlphabet.hidden) return;
     let active = overviewGroupsOnScreen[0]?.key;
     for (const group of overviewGroupsOnScreen) {
-      if (group.section.getBoundingClientRect().top <= overview.querySelector('.gbv-toolbar').getBoundingClientRect().bottom + 16) active = group.key;
+      if (group.section.getBoundingClientRect().top <= overview.getBoundingClientRect().top + overviewHeadingOffset() + 1) active = group.key;
       else break;
     }
     if (overview.scrollTop > 0 && overview.scrollTop + overview.clientHeight >= overview.scrollHeight - 2) active = overviewGroupsOnScreen.at(-1)?.key;
@@ -3222,7 +3241,7 @@ function renderFamilyCards(speciesList = []) {
     const button = event.target.closest('[data-letter]');
     if (!button || button.disabled) return;
     const group = overviewGroupsOnScreen.find((entry) => entry.key === button.dataset.letter);
-    if (group) overview.scrollTo({ top: Math.max(0, overview.scrollTop + group.section.getBoundingClientRect().top - Math.max(78, parseFloat(getComputedStyle(overview.querySelector('.gbv-toolbar')).top) + overview.querySelector('.gbv-toolbar').offsetHeight + 14)), behavior: overviewReducedMotion() ? 'instant' : 'smooth' });
+    if (group) overview.scrollTo({ top: Math.max(0, overview.scrollTop + group.section.getBoundingClientRect().top - overviewHeadingOffset()), behavior: overviewReducedMotion() ? 'instant' : 'smooth' });
   });
   overview.addEventListener('scroll', () => {
     if (!overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
@@ -3233,6 +3252,10 @@ function renderFamilyCards(speciesList = []) {
   });
   document.addEventListener('pointerdown', (event) => {
     if (!overview.querySelector('.gbv-select').contains(event.target)) setOverviewMenu(false);
+  });
+
+  addEventListener('resize', () => {
+    if (activeView === 'cards' && !overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
   });
 
   const searchRoot = document.createElement('section');
