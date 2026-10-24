@@ -187,6 +187,61 @@
 
   if (!DOM.globeHost) return;
 
+  // Full-bleed mobile canvas; retain every existing viewport setting.
+  const viewportMeta = document.querySelector('meta[name="viewport"]') || document.head.appendChild(document.createElement('meta'));
+  viewportMeta.name = 'viewport';
+  const viewportParts = (viewportMeta.content || 'width=device-width, initial-scale=1').split(',')
+    .map(value => value.trim()).filter(value => value && !/^viewport-fit\s*=/i.test(value));
+  viewportMeta.content = [...viewportParts, 'viewport-fit=cover'].join(', ');
+  const themeMeta = document.querySelector('meta[name="theme-color"]') || document.head.appendChild(document.createElement('meta'));
+  themeMeta.name = 'theme-color';
+  themeMeta.content = '#04052a';
+
+  function germanDisplayName(value) {
+    // Safari's German dictionary handles ordinary words; mark this mixed bird name explicitly.
+    return String(value || '').replace(/Akepakleidervogel/g, 'Akepa\u00adkleider\u00advogel');
+  }
+
+  function preparePanelTypography() {
+    for (const element of [DOM.panelNameDe, DOM.genusNameDe, DOM.genusNameLat, DOM.familyNameDe, DOM.familyNameLat]) {
+      element?.classList.add('globe-panel-title');
+      element?.setAttribute('lang', 'de');
+    }
+    for (const panel of [DOM.panelEl, DOM.genusPanel, DOM.familyPanel]) {
+      if (!panel) continue;
+      for (const element of panel.querySelectorAll('h1, h2, h3, h4, div, p')) {
+        if (element.childElementCount === 0 && /^(Verbreitung\s*&\s*Lebensraum|Aussterben)$/.test(element.textContent.trim())) {
+          element.classList.add('globe-panel-subheading');
+        }
+      }
+    }
+  }
+
+  function prepareSpeciesBreadcrumb() {
+    const fields = [DOM.panelFamilyLink, DOM.panelGenusLink, DOM.panelNameLat].filter(Boolean);
+    if (fields.length < 2) return;
+    let row = fields[0].parentElement;
+    while (row && !fields.every(field => row.contains(field))) row = row.parentElement;
+    // Never rebuild a broader content container that also holds the panel title or image.
+    if (!row || row === DOM.panelEl || row.contains(DOM.panelNameDe) || row.contains(DOM.panelImg)) return;
+    row.classList.add('globe-breadcrumb');
+    fields.forEach(field => field.classList.add('globe-breadcrumb-item'));
+    row.replaceChildren(...fields); // Keep the original links and their event listeners.
+  }
+
+  function preparePanelInsets() {
+    const fields = [DOM.panelFamilyLink, DOM.panelNameDe, DOM.panelDesc, DOM.panelHabitat, DOM.panelExtinction].filter(Boolean);
+    if (!fields.length) return;
+    let copy = fields[0].parentElement;
+    while (copy && !fields.every(field => copy.contains(field))) copy = copy.parentElement;
+    if (copy && copy !== DOM.panelEl && !copy.contains(DOM.panelImg)) copy.classList.add('globe-panel-text');
+  }
+
+  preparePanelTypography();
+  prepareSpeciesBreadcrumb();
+  preparePanelInsets();
+
+
   // =========================================================
   // INTRO — shown on every page load, never stored in the browser.
   // =========================================================
@@ -597,6 +652,18 @@
       btn.id = "ai-image-info-button";
       btn.type = "button";
       DOM.panelImg.parentElement.appendChild(btn);
+    }
+
+    if (DOM.panelImg && btn) {
+      const imageRoot = DOM.panelImg.closest('picture') || DOM.panelImg;
+      let wrap = imageRoot.closest('.panel-image-wrap');
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.className = 'panel-image-wrap';
+        imageRoot.parentElement.insertBefore(wrap, imageRoot);
+        wrap.appendChild(imageRoot);
+      }
+      if (btn.parentElement !== wrap) wrap.appendChild(btn);
     }
 
     DOM.aiImageInfoButton = btn || null;
@@ -2111,7 +2178,7 @@
 
     U.setText(DOM.panelFamilyLink, item.taxonomy.family);
     U.setText(DOM.panelGenusLink, item.taxonomy.genus);
-    U.setText(DOM.panelNameDe, item.name.de);
+    U.setText(DOM.panelNameDe, germanDisplayName(item.name.de));
     U.setText(DOM.panelNameLat, item.name.lat);
     U.setText(DOM.panelExtDate, item.extinction_date || item.last_seen || "");
 
@@ -2211,6 +2278,14 @@
       while (copy && copy !== body && (!copy.contains(nameLatEl) || !copy.contains(extDateEl))) copy = copy.parentElement;
       if (copy && copy !== body) copy.classList.add('globe-card-copy');
       else body.classList.add('has-flat-card-copy');
+      for (const field of [nameDeEl, nameLatEl, extDateEl].filter(Boolean)) {
+        let path = field.parentElement;
+        while (path && path !== copy && path !== body) {
+          path.classList.add('globe-card-text-path');
+          path = path.parentElement;
+        }
+      }
+
       for (const child of body.children) {
         if (child !== habitatEl && child.childElementCount === 0 && !child.textContent.trim()) child.classList.add('globe-card-divider');
       }
@@ -3466,6 +3541,8 @@ function renderFamilyCards(speciesList = []) {
     tooltipSurface.style.setProperty('flex-direction', 'row', 'important');
     if (avatar) avatar.classList.add('gs-source-avatar');
     if (title) {
+      title.classList.add('globe-search-title');
+      title.setAttribute('lang', 'de');
       let textColumn = title.parentElement;
       while (textColumn && textColumn.parentElement !== tooltipSurface && textColumn !== tooltipSurface) textColumn = textColumn.parentElement;
       if (textColumn && textColumn !== tooltipSurface) textColumn.classList.add('gs-source-text');
@@ -3473,7 +3550,7 @@ function renderFamilyCards(speciesList = []) {
     card.setAttribute('role', 'button');
     card.tabIndex = 0;
     card.setAttribute('aria-label', `${type === 'species' ? 'Art' : type === 'genus' ? 'Gattung' : 'Familie'}: ${item.name?.de || item.name?.lat || item.id}`);
-    U.setText(title, item.name?.de || item.name?.lat || item.id);
+    U.setText(title, germanDisplayName(item.name?.de || item.name?.lat || item.id));
     U.setText(latin, item.name?.lat || '');
     // The original Webflow date row already owns its extinction symbol.
     const dateValue = item.extinction_date || item.last_seen || '';
