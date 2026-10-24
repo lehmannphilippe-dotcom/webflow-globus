@@ -1783,6 +1783,36 @@ body { min-height: 100vh; min-height: 100dvh; }
   .globe-breadcrumb > .globe-breadcrumb-item + .globe-breadcrumb-item { border-left: 1px solid #7493c6; }
 }
 
+/* Match the search result's text flow, keeping only the map title single-line. */
+#species-tooltip {
+  width: max-content !important;
+  min-width: 0 !important; max-width: none !important;
+  height: auto !important; max-height: none !important;
+}
+#species-tooltip .tooltip-card {
+  width: max-content !important; max-width: none !important;
+  height: auto !important; max-height: none !important;
+  flex-wrap: nowrap !important;
+}
+#species-tooltip .tooltip-content {
+  width: max-content !important; min-width: 0 !important; max-width: none !important;
+  height: auto !important; max-height: none !important;
+  flex: 0 0 auto !important;
+}
+#species-tooltip #tooltip-name-de {
+  font-family: "Globe UI Inter", Inter, sans-serif !important;
+  font-weight: 600 !important;
+  height: auto !important; min-height: 0 !important; max-height: none !important;
+  width: auto !important; max-width: none !important;
+  white-space: nowrap !important;
+  -webkit-hyphens: none; hyphens: none; overflow-wrap: normal; word-break: normal;
+}
+#species-tooltip #tooltip-name-lat {
+  height: auto !important; min-height: 0 !important; max-height: none !important;
+  width: auto !important;
+}
+#species-tooltip #tooltip-avatar { flex-shrink: 0 !important; }
+
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
   --gbv-arrow: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJrZXlib2FyZF9hcnJvd19kb3duXzI0ZHBfRTNFM0UzX0ZJTEwwX3dnaHQ0MDBfR1JBRDBfb3BzejI0IDEiPgo8cGF0aCBpZD0iVmVjdG9yIiBkPSJNMTIgMTUuNEw2IDkuNEw3LjQgOEwxMiAxMi42TDE2LjYgOEwxOCA5LjRMMTIgMTUuNFoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L3N2Zz4K");
