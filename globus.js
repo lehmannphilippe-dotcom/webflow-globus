@@ -2016,6 +2016,37 @@
     { passive: true }
   );
 
+  // Reuse each Webflow date row, replacing only its extinction icon.
+  function normalizeExtinctionDate(date) {
+    if (!date) return;
+    let row = date.closest('.last-seen-content, .card-date, .card-last-seen');
+    if (!row) row = date.parentElement;
+    if (!row) return;
+    if (row.classList.contains('card-body') || row === DOM.tip) {
+      const wrapper = document.createElement('div');
+      row.insertBefore(wrapper, date);
+      wrapper.appendChild(date);
+      row = wrapper;
+    }
+    row.classList.add('globe-extinction-row');
+    date.classList.add('globe-extinction-value');
+    let icon = row.querySelector('.cross, .globe-extinction-cross, img, svg');
+    if (!icon || icon.tagName !== 'IMG') {
+      const image = document.createElement('img');
+      if (icon) icon.replaceWith(image);
+      else row.insertBefore(image, date);
+      icon = image;
+    }
+    icon.classList.add('globe-extinction-cross');
+    icon.removeAttribute('srcset');
+    icon.removeAttribute('sizes');
+    icon.src = 'data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjEwIiBoZWlnaHQ9IjEzLjYzNjciIHZpZXdCb3g9IjAgMCAxMCAxMy42MzY3IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBpZD0iVW5pb24iIGQ9Ik01LjYyMTA5IDBDNS45MzIzMiAwLjAwMDIzNTY0MSA2LjE4NDU3IDAuMjQzNzU1IDYuMTg0NTcgMC41NDM5NDVWMy40MTY5OUg5LjQzNTU1QzkuNzQ2OTQgMy40MTY5OSA5Ljk5OTk0IDMuNjU5NjcgMTAgMy45NTk5NlY1LjExNDI2QzkuOTk5ODMgNS40MTQ0NSA5Ljc0Nzg0IDUuNjU3MjEgOS40MzY1MiA1LjY1NzIzSDYuMTg0NTdWMTMuMDkyOEM2LjE4NDU3IDEzLjM5MyA1LjkzMTc2IDEzLjYzNjUgNS42MjEwOSAxMy42MzY3SDQuNDIzODNDNC4xMTI1MyAxMy42MzY2IDMuODYwMzUgMTMuMzkzIDMuODYwMzUgMTMuMDkyOFY1LjY1NzIzSDAuNTYzNDc3QzAuMjUyMzA3IDUuNjU3MDUgMC4wMDAxNjg3NDkgNS40MTQzNSAwIDUuMTE0MjZWMy45NTk5NkM1Ljc2Mjc3ZS0wNSAzLjY1OTc4IDAuMjUyMjM4IDMuNDE3MTcgMC41NjM0NzcgMy40MTY5OUgzLjg2MDM1VjAuNTQzOTQ1QzMuODYwMzUgMC4yNDM3MDUgNC4xMTI1MyAwLjAwMDE1MzI3IDQuNDIzODMgMEg1LjYyMTA5WiIgZmlsbD0iI0ZGNTEwMCIvPgo8L3N2Zz4K';
+    icon.width = 10;
+    icon.height = 13.6367;
+    icon.alt = '';
+    icon.setAttribute('aria-hidden', 'true');
+  }
+
   function hideTooltip() {
     if (!DOM.tip) return;
     DOM.tip.style.opacity = "0";
@@ -2031,6 +2062,7 @@
     U.setText(DOM.tipNameDe, item.name.de);
     U.setText(DOM.tipNameLat, item.name.lat);
     U.setText(DOM.tipLast, item.last_seen);
+    if (DOM.tipLast) DOM.tipLast.closest(".globe-extinction-row").hidden = !item.last_seen;
 
     const w = DOM.tip.offsetWidth || 320;
     const h = DOM.tip.offsetHeight || 180;
@@ -2045,6 +2077,7 @@
 
   }
 
+  normalizeExtinctionDate(DOM.tipLast);
   hideTooltip();
 
   document.addEventListener(
@@ -2172,6 +2205,17 @@
       ".card-extinction-date, .genus-extinction-date"
     );
     const habitatEl = card.querySelector(".card-habitat");
+    const body = card.querySelector('.card-body');
+    if (body && nameDeEl) {
+      let copy = nameDeEl.parentElement;
+      while (copy && copy !== body && (!copy.contains(nameLatEl) || !copy.contains(extDateEl))) copy = copy.parentElement;
+      if (copy && copy !== body) copy.classList.add('globe-card-copy');
+      else body.classList.add('has-flat-card-copy');
+      for (const child of body.children) {
+        if (child !== habitatEl && child.childElementCount === 0 && !child.textContent.trim()) child.classList.add('globe-card-divider');
+      }
+    }
+
 
     if (!options.deferImage) U.setWFImage(imgEl, item?.images?.panel || CONFIG.DEFAULT_PANEL_IMG);
     U.setText(nameDeEl, item?.name?.de || "");
@@ -2179,7 +2223,11 @@
 
     const date = item?.extinction_date || item?.last_seen || "";
     U.setText(extDateEl, date);
-    if (extDateEl) extDateEl.style.display = date ? "" : "none";
+    normalizeExtinctionDate(extDateEl);
+    if (extDateEl) {
+      extDateEl.style.display = date ? "" : "none";
+      extDateEl.closest(".globe-extinction-row").hidden = !date;
+    }
 
     U.setText(habitatEl, item?.habitat || "");
     if (habitatEl) habitatEl.style.display = item?.habitat ? "" : "none";
@@ -2917,6 +2965,8 @@ function renderFamilyCards(speciesList = []) {
   const overviewAlphabet = overview.querySelector('.gbv-alphabet');
   const overviewSortButton = overview.querySelector('.gbv-sort');
   const overviewOptions = overview.querySelector('.gbv-options');
+  // Keep the menu above cards without lifting the opaque header over group titles.
+  overview.appendChild(overviewOptions);
   const overviewOptionButtons = [...overviewOptions.querySelectorAll('[data-sort]')];
   let overviewSort = 'year';
   let overviewDataReady = false;
@@ -2992,8 +3042,19 @@ function renderFamilyCards(speciesList = []) {
     });
   }
 
+  function positionOverviewMenu() {
+    const rect = overviewSortButton.getBoundingClientRect();
+    overviewOptions.style.left = `${rect.left}px`;
+    overviewOptions.style.top = `${rect.bottom + 2}px`;
+    overviewOptions.style.width = `${rect.width}px`;
+  }
+  function isWithinOverviewSort(target) {
+    return overview.querySelector('.gbv-select').contains(target) || overviewOptions.contains(target);
+  }
+
   function setOverviewMenu(open, focusOption = false) {
     overviewMenuOpen = open;
+    if (open) positionOverviewMenu();
     overview.classList.toggle("is-sort-open", open);
     overviewOptions.toggleAttribute('inert', !open);
     overviewOptions.classList.toggle('is-open', open);
@@ -3244,17 +3305,19 @@ function renderFamilyCards(speciesList = []) {
     if (group) overview.scrollTo({ top: Math.max(0, overview.scrollTop + group.section.getBoundingClientRect().top - overviewHeadingOffset()), behavior: overviewReducedMotion() ? 'instant' : 'smooth' });
   });
   overview.addEventListener('scroll', () => {
+    if (overviewMenuOpen) positionOverviewMenu();
     if (!overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
   }, { passive: true });
   overview.addEventListener('click', (event) => event.stopPropagation());
   overview.addEventListener('focusout', (event) => {
-    if (!overview.querySelector('.gbv-select').contains(event.relatedTarget)) setOverviewMenu(false);
+    if (!isWithinOverviewSort(event.relatedTarget)) setOverviewMenu(false);
   });
   document.addEventListener('pointerdown', (event) => {
-    if (!overview.querySelector('.gbv-select').contains(event.target)) setOverviewMenu(false);
+    if (!isWithinOverviewSort(event.target)) setOverviewMenu(false);
   });
 
   addEventListener('resize', () => {
+    if (overviewMenuOpen) positionOverviewMenu();
     if (activeView === 'cards' && !overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
   });
 
@@ -3415,6 +3478,7 @@ function renderFamilyCards(speciesList = []) {
     // The original Webflow date row already owns its extinction symbol.
     const dateValue = item.extinction_date || item.last_seen || '';
     U.setText(date, dateValue);
+    normalizeExtinctionDate(date);
     if (date) {
       const dateRow = date.closest('.last-seen-content');
       (dateRow || date).hidden = !dateValue;
