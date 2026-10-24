@@ -1484,7 +1484,7 @@
   function registerRangeAreas(ds, key, item) {
     const content = item.range_popups?.[key];
     const color = CONFIG.RANGES_STYLE[key]?.fill?.toCssColorString();
-    for (const entity of ds.entities.values) if (entity.polygon) {
+    for (const entity of ds.entities.values) if (entity.polygon || entity.polyline) {
       rangeHoverTargets.set(entity, {
         kind: 'area', color,
         content: rangePopupContent(content?.title, content?.text)
@@ -1615,33 +1615,63 @@
     } catch {}
   }
 
-  function stylePolygonDataSource(ds, key) {
+  // Backwards compatible: one URL, or { fill: URL|null, outline: URL|null }.
+  function rangeSourceParts(value) {
+    if (typeof value === 'string' && value.trim()) return [{ url: value, role: 'combined' }];
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+    return ['fill', 'outline'].flatMap(role => {
+      const url = value[role];
+      return typeof url === 'string' && url.trim() ? [{ url, role }] : [];
+    });
+  }
+
+  async function loadRangeDataSource(url) {
+    let ds = rangeCache.get(url);
+    if (ds) return ds;
+    try {
+      ds = await Cesium.GeoJsonDataSource.load(url, { clampToGround: true });
+      rangeCache.set(url, ds);
+      return ds;
+    } catch (error) {
+      console.warn('Verbreitungsgeometrie konnte nicht geladen werden', url, error);
+      return null;
+    }
+  }
+
+  function stylePolygonDataSource(ds, key, role = 'combined', startedAt = performance.now()) {
     const st = CONFIG.RANGES_STYLE[key];
     if (!st) return;
-
-    const fade = { alpha: 0 };
-    const mat = new Cesium.ColorMaterialProperty(
-      new Cesium.CallbackProperty(() => st.fill.withAlpha(fade.alpha), false)
+    const fade = { progress: 0 };
+    const fillMaterial = new Cesium.ColorMaterialProperty(
+      new Cesium.CallbackProperty(() => st.fill.withAlpha(fade.progress * (st.alpha ?? 0.45)), false)
     );
-
-    for (const e of ds.entities.values) {
-      if (!e.polygon) continue;
-      e.polygon.material = mat;
-      e.polygon.outline = !!st.outline;
-      if (st.outline) {
-        e.polygon.outlineColor = st.outline.withAlpha(st.outlineAlpha ?? 1);
+    const lineColor = st.outline || st.fill;
+    const lineMaterial = new Cesium.ColorMaterialProperty(
+      new Cesium.CallbackProperty(() => lineColor.withAlpha(fade.progress * (st.outlineAlpha ?? 1)), false)
+    );
+    for (const entity of ds.entities.values) {
+      if (entity.polygon) {
+        entity.polygon.show = role !== 'outline';
+        entity.polygon.material = fillMaterial;
+        // Split fill pieces must never draw their internal partition edges.
+        entity.polygon.outline = role === 'combined' && !!st.outline;
+        if (st.outline) entity.polygon.outlineColor = st.outline.withAlpha(st.outlineAlpha ?? 1);
+        entity.polygon.height = 0;
+        entity.polygon.extrudedHeight = 0;
       }
-      e.polygon.height = 0;
-      e.polygon.extrudedHeight = 0;
+      if (entity.polyline) {
+        entity.polyline.show = role !== 'fill';
+        entity.polyline.material = lineMaterial;
+        entity.polyline.width = 1;
+        entity.polyline.clampToGround = true;
+      }
     }
-
-    const tStart = performance.now();
+    const stylingToken = rangeLoadToken;
     const tick = () => {
-      const p = Math.min((performance.now() - tStart) / (st.fadeMs || 220), 1);
-      fade.alpha = p * (st.alpha ?? 0.45);
-      if (p < 1) requestAnimationFrame(tick);
+      if (stylingToken !== rangeLoadToken) return;
+      fade.progress = Math.min((performance.now() - startedAt) / (st.fadeMs || 220), 1);
+      if (fade.progress < 1) requestAnimationFrame(tick);
     };
-
     requestAnimationFrame(tick);
   }
 
@@ -1680,15 +1710,8 @@
     if (loadToken !== rangeLoadToken) return;
     document.body.classList.toggle('range-hover-enabled', activeView === 'globe' && speciesDesktop());
 
-    const primaryKey = ranges.range_native
-      ? "range_native"
-      : ranges.breeding_native
-      ? "breeding_native"
-      : ranges.range_hypothetical
-      ? "range_hypothetical"
-      : ranges.passage
-      ? "passage"
-      : null;
+    const primaryKey = ['range_native', 'breeding_native', 'range_hypothetical', 'passage']
+      .find(key => rangeSourceParts(ranges[key]).length) || null;
 
     for (const key of [
       "range_native",
@@ -1696,27 +1719,23 @@
       "range_hypothetical",
       "passage"
     ]) {
-      const url = ranges[key];
-      if (!url) continue;
-
-      let ds = rangeCache.get(url);
-      if (!ds) {
-        try { ds = await Cesium.GeoJsonDataSource.load(url, { clampToGround: true }); }
-        catch (error) { console.warn("Verbreitungsfläche konnte nicht geladen werden", url, error); continue; }
-        rangeCache.set(url, ds);
-      }
-
+      const parts = rangeSourceParts(ranges[key]);
+      // Prepare both parts before showing either one, using one shared fade clock.
+      const loaded = await Promise.all(parts.map(async part => ({ ...part, ds: await loadRangeDataSource(part.url) })));
       if (loadToken !== rangeLoadToken) return;
-      if (!viewer.dataSources.contains(ds)) await viewer.dataSources.add(ds);
-      if (loadToken !== rangeLoadToken) {
-        if (!activeRangeDS.includes(ds) && viewer.dataSources.contains(ds)) viewer.dataSources.remove(ds, false);
-        return;
+      const startedAt = performance.now();
+      for (const { ds, role } of loaded) {
+        if (!ds) continue;
+        if (!viewer.dataSources.contains(ds)) await viewer.dataSources.add(ds);
+        if (loadToken !== rangeLoadToken) {
+          if (!activeRangeDS.includes(ds) && viewer.dataSources.contains(ds)) viewer.dataSources.remove(ds, false);
+          return;
+        }
+        stylePolygonDataSource(ds, key, role, startedAt);
+        registerRangeAreas(ds, key, item);
+        if (!activeRangeDS.includes(ds)) activeRangeDS.push(ds);
+        if (primaryKey && key === primaryKey && role !== 'outline') currentPrimaryPolygonDS = ds;
       }
-      stylePolygonDataSource(ds, key);
-      registerRangeAreas(ds, key, item);
-      activeRangeDS.push(ds);
-
-      if (primaryKey && key === primaryKey) currentPrimaryPolygonDS = ds;
     }
 
     for (const pointKey of ["breeding_spots", "find_spots", "last_observation"]) {
@@ -1767,24 +1786,22 @@
     document.body.classList.toggle('genus-marker-interaction', items.length > 1);
     const sources = new Map();
     for (const item of items) for (const key of ['range_native', 'range_hypothetical']) {
-      const url = item.ranges?.[key];
-      if (url && !sources.has(url)) sources.set(url, key);
-    }
-    for (const [url, key] of sources) {
-      let ds = rangeCache.get(url);
-      if (!ds) {
-        try { ds = await Cesium.GeoJsonDataSource.load(url, { clampToGround: true }); }
-        catch (error) { console.warn('Gattungsfläche konnte nicht geladen werden', url, error); continue; }
-        rangeCache.set(url, ds);
+      for (const part of rangeSourceParts(item.ranges?.[key])) {
+        if (!sources.has(part.url)) sources.set(part.url, { ...part, key });
       }
-      if (loadToken !== rangeLoadToken) return;
+    }
+    const loaded = await Promise.all([...sources.values()].map(async part => ({ ...part, ds: await loadRangeDataSource(part.url) })));
+    if (loadToken !== rangeLoadToken) return;
+    const startedAt = performance.now();
+    for (const { ds, key, role } of loaded) {
+      if (!ds) continue;
       if (!viewer.dataSources.contains(ds)) await viewer.dataSources.add(ds);
       if (loadToken !== rangeLoadToken) {
         if (!activeRangeDS.includes(ds) && viewer.dataSources.contains(ds)) viewer.dataSources.remove(ds, false);
         return;
       }
-      stylePolygonDataSource(ds, key);
-      activeRangeDS.push(ds);
+      stylePolygonDataSource(ds, key, role, startedAt);
+      if (!activeRangeDS.includes(ds)) activeRangeDS.push(ds);
     }
     if (loadToken === rangeLoadToken && flightToken === speciesFlightToken && activeGenusItems === items) {
       frameGenusMap();
@@ -1856,6 +1873,7 @@
     };
     for (const ds of activeRangeDS) for (const entity of ds.entities.values) {
       if (entity.polygon?.hierarchy) visit(entity.polygon.hierarchy.getValue(time));
+      if (entity.polyline?.positions) result.push(...(entity.polyline.positions.getValue(time) || []));
     }
     // All three spot layers share this collection. Include them alongside every
     // polygon layer, including species with spots but no polygon geometry.
