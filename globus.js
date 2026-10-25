@@ -89,7 +89,7 @@
       },
       passage: {
         fill: Cesium.Color.fromCssColorString("#4C61D7"),
-        alpha: 0.25,
+        alpha: 0.5,
         outline: null,
         fadeMs: 220
       }
