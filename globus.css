@@ -1813,6 +1813,91 @@ body { min-height: 100vh; min-height: 100dvh; }
 }
 #species-tooltip #tooltip-avatar { flex-shrink: 0 !important; }
 
+/* Mobile content must fit the actual panel, including inherited Webflow wrappers. */
+@media (max-width: 860px) {
+  .info-panel .globe-panel-flow {
+    box-sizing: border-box !important; width: 100% !important; min-width: 0 !important;
+    max-width: 100% !important; margin-left: 0 !important; margin-right: 0 !important;
+    padding-left: 0 !important; padding-right: 0 !important;
+  }
+  .info-panel .globe-panel-text {
+    padding-left: max(24px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(24px, env(safe-area-inset-right, 0px)) !important;
+  }
+  .info-panel .globe-panel-copy-field,
+  .info-panel .globe-panel-text > * {
+    box-sizing: border-box !important; min-width: 0 !important; max-width: 100% !important;
+    overflow-wrap: anywhere; white-space: normal !important;
+  }
+  .info-panel .globe-panel-copy-field:not(.globe-breadcrumb-item) { width: 100% !important; }
+  .info-panel .globe-breadcrumb {
+    display: grid !important; grid-template-columns: minmax(0, 1.15fr) minmax(0, .9fr) minmax(0, 1.15fr);
+    align-items: stretch !important; width: 100% !important; max-width: 100% !important;
+    padding: 0 !important; margin-left: 0 !important; margin-right: 0 !important;
+    font-size: 14px !important; line-height: 20px !important; gap: 0 !important;
+  }
+  .info-panel .globe-breadcrumb > .globe-breadcrumb-item,
+  .info-panel .globe-breadcrumb > .globe-breadcrumb-item:nth-child(2) {
+    min-width: 0 !important; width: auto !important; max-width: 100% !important;
+    white-space: normal !important; overflow-wrap: anywhere; font-size: inherit !important;
+    line-height: inherit !important; text-align: left !important;
+  }
+  .info-panel .globe-breadcrumb-item * {
+    min-width: 0 !important; max-width: 100% !important; white-space: normal !important;
+    font-size: inherit !important; line-height: inherit !important; overflow-wrap: anywhere;
+  }
+  #species-panel .panel-image-wrap {
+    position: relative !important; display: block !important;
+    min-width: 0 !important; max-width: 100% !important; height: auto !important;
+    flex: 0 0 auto !important;
+  }
+  #species-panel .panel-image-wrap #panel-image { max-width: 100% !important; margin: 0 !important; }
+  #species-panel .panel-image-wrap #ai-image-info-button {
+    left: auto !important; top: auto !important; right: 16px !important; bottom: 16px !important;
+    width: 28px !important; height: 28px !important; transform: none !important;
+  }
+  :is(#species-panel, #family-panel, #genus-panel, #ai-image-modal) > .globe-mobile-close {
+    position: absolute !important;
+    top: calc(12px + env(safe-area-inset-top, 0px)) !important;
+    right: calc(18px + env(safe-area-inset-right, 0px)) !important;
+    width: 44px !important; height: 44px !important;
+    min-width: 44px !important; min-height: 44px !important; max-width: 44px !important;
+    display: flex !important; align-items: center !important; justify-content: center !important;
+    padding: 10px !important; margin: 0 !important; border: 0 !important;
+    background: transparent !important; box-shadow: none !important; color: transparent !important;
+    font-size: 0 !important; line-height: 0 !important; transform: none !important; z-index: 10000 !important;
+  }
+  .globe-mobile-close > * { display: none !important; }
+  .globe-mobile-close::before {
+    content: "" !important; display: block !important; width: 24px !important; height: 24px !important;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 5L19 19M19 5L5 19' fill='none' stroke='%23ff5100' stroke-width='2'/%3E%3C/svg%3E") center/24px 24px no-repeat !important;
+  }
+  .globe-mobile-close::after { display: none !important; }
+  .ai-image-modal { height: 100dvh; }
+  .ai-image-modal__card { box-sizing: border-box; width: 100%; height: 100dvh; max-height: 100dvh; }
+}
+
+@media (max-width: 860px) {
+  .info-panel .globe-breadcrumb { display: flex !important; }
+  .info-panel .globe-breadcrumb > .globe-breadcrumb-item:first-child {
+    flex: 0 1 auto !important; width: min-content !important; max-width: 40% !important;
+    overflow-wrap: break-word !important;
+  }
+  .info-panel .globe-breadcrumb > .globe-breadcrumb-item:nth-child(2) {
+    flex: 0 1 auto !important; width: max-content !important; max-width: 35% !important;
+  }
+  .info-panel .globe-breadcrumb > .globe-breadcrumb-item:last-child {
+    flex: 0 1 auto !important; width: max-content !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .info-panel .globe-panel-copy-field * {
+    box-sizing: border-box !important; min-width: 0 !important; max-width: 100% !important;
+    white-space: normal !important; overflow-wrap: anywhere;
+  }
+}
+
 /* Species overview: only the container is new; every card is cloned from Webflow. */
 #species-browser {
   --gbv-arrow: url("data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJrZXlib2FyZF9hcnJvd19kb3duXzI0ZHBfRTNFM0UzX0ZJTEwwX3dnaHQ0MDBfR1JBRDBfb3BzejI0IDEiPgo8cGF0aCBpZD0iVmVjdG9yIiBkPSJNMTIgMTUuNEw2IDkuNEw3LjQgOEwxMiAxMi42TDE2LjYgOEwxOCA5LjRMMTIgMTUuNFoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L3N2Zz4K");
@@ -1913,10 +1998,10 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
 #species-browser .gbv-card .card-body { width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; flex: 1 1 auto !important; }
 #species-browser .gbv-card .card-name-de, #species-browser .gbv-card .card-name-lat, #species-browser .gbv-card .card-habitat { height: auto !important; max-height: none !important; white-space: normal !important; overflow-wrap: anywhere; }
 #species-browser .gbv-card:focus-visible { outline: 2px solid #ff5100; outline-offset: 2px; }
-#species-browser.has-alphabet { --gbv-inset-left: 44px; padding-left: 44px; }
-#species-browser .gbv-alphabet { position: fixed; left: max(4px, env(safe-area-inset-left, 0px)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; width: 24px; }
+#species-browser.has-alphabet { --gbv-inset-right: 44px; padding-right: 44px; }
+#species-browser .gbv-alphabet { position: fixed; right: max(4px, env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; width: 28px; z-index: 5; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
 #species-browser .gbv-alphabet[hidden] { display: none; }
-#species-browser .gbv-alphabet button { padding: 0; width: 24px; height: clamp(14px, calc((100dvh - 160px) / 26), 28px); border: 0; background: transparent; color: #7da1da; font: 800 20px/20px "Globe UI Inter", Inter, sans-serif; transition: color 150ms ease-out; cursor: pointer; }
+#species-browser .gbv-alphabet button { flex: 0 0 auto; padding: 0; width: 24px; height: clamp(14px, calc((100dvh - 160px) / 26), 28px); border: 0; background: transparent; color: #7da1da; font: 800 20px/20px "Globe UI Inter", Inter, sans-serif; transition: color 150ms ease-out; cursor: pointer; }
 #species-browser .gbv-alphabet button[aria-current="true"] { color: white; }
 #species-browser .gbv-alphabet button:disabled { opacity: .3; cursor: default; }
 #species-browser .gbv-alphabet button:focus-visible { outline: 1px solid #ff5100; border-radius: 3px; }
@@ -1931,9 +2016,9 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
   #species-browser .gbv-heading { width: 100%; max-width: none; font-size: 32px; line-height: 30px; gap: 6px; }
   #species-browser .gbv-count { font-size: 18px; line-height: 24px; }
   #species-browser .gbv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  #species-browser.has-alphabet { --gbv-inset-left: 34px; padding-left: 34px; }
-  #species-browser .gbv-alphabet { width: 20px; }
-  #species-browser .gbv-alphabet button { width: 20px; height: clamp(12px, 1.8dvh, 18px); font-size: clamp(11px, 1.8dvh, 20px); line-height: 1; }
+  #species-browser.has-alphabet { --gbv-inset-right: 44px; padding-right: 44px; }
+  #species-browser .gbv-alphabet { width: 32px; }
+  #species-browser .gbv-alphabet button { width: 32px; height: 28px; min-height: 28px; font-size: 14px; line-height: 20px; }
 }
 @media (max-width: 540px) { #species-browser .gbv-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) {
@@ -1948,4 +2033,24 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
 }
 @media (hover: hover) {
   #species-browser .gbv-alphabet button:not(:disabled):hover { color: #fff; }
+}
+
+#species-browser .gbv-alphabet::-webkit-scrollbar { display: none; }
+@media (max-width: 860px) {
+  #species-browser { --gbv-mobile-safe-top: env(safe-area-inset-top, 0px); --gbv-toolbar-top: calc(64px + env(safe-area-inset-top, 0px)); }
+  #species-browser .gbv-toolbar { transition: translate 180ms ease-out, opacity 180ms ease-out; }
+  #species-browser .gbv-heading { transition: top 180ms ease-out; padding-top: 4px; padding-bottom: 6px; }
+  body.globe-overview-header-hidden #species-browser { --gbv-heading-top: env(safe-area-inset-top, 0px); }
+  body.globe-overview-header-hidden #species-browser .gbv-toolbar { translate: 0 -220px; opacity: 0; pointer-events: none; }
+  body.globe-cards-view #globe-brand,
+  body.globe-cards-view #globe-view-switch,
+  body.globe-cards-view #globe-search:not(.is-open) { transition: translate 180ms ease-out, opacity 180ms ease-out; }
+  body.globe-cards-view.globe-overview-header-hidden #globe-brand,
+  body.globe-cards-view.globe-overview-header-hidden #globe-view-switch,
+  body.globe-cards-view.globe-overview-header-hidden #globe-search:not(.is-open) { translate: 0 -160px; opacity: 0; visibility: hidden; pointer-events: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #species-browser .gbv-toolbar, #species-browser .gbv-heading,
+  body.globe-cards-view #globe-brand, body.globe-cards-view #globe-view-switch,
+  body.globe-cards-view #globe-search:not(.is-open) { transition: none; }
 }
