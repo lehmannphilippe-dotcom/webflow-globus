@@ -89,7 +89,7 @@
       },
       passage: {
         fill: Cesium.Color.fromCssColorString("#7E70EB"),
-        alpha: 0.5,
+        alpha: 0.3,
         outline: null,
         fadeMs: 220
       }
@@ -1926,6 +1926,19 @@
     return smaller.sort((a, b) => speciesRangeExtent(a) - speciesRangeExtent(b))[0] || positions;
   }
 
+  // Continuous power curves reduce excess context already at archipelago scale.
+  // Anchors: small island (80 km / 4), archipelago (600 km / 1.12), ocean (5000 km / 0.65).
+  function speciesContextScale(extent) {
+    if (extent <= 80000) return 4;
+    if (extent < 600000) {
+      return 4 * Math.pow(extent / 80000, Math.log(1.12 / 4) / Math.log(600000 / 80000));
+    }
+    if (extent < 5000000) {
+      return 1.12 * Math.pow(extent / 600000, Math.log(0.65 / 1.12) / Math.log(5000000 / 600000));
+    }
+    return 0.65;
+  }
+
   // Symmetric projection avoids black strips in Cesium's ground render passes.
   // An explicit contextScale retains the established genus framing.
   function speciesDestination(positions, width, height, panelWidth, frustum, contextScale = null, focusPositions = positions) {
@@ -1933,7 +1946,7 @@
     const adaptive = contextScale == null;
     const progress = adaptive ? Cesium.Math.clamp((extent - 800000) / 4200000, 0, 1) : 0;
     const blend = progress * progress * (3 - 2 * progress);
-    const scale = adaptive ? 4 + (0.65 - 4) * blend : contextScale;
+    const scale = adaptive ? speciesContextScale(extent) : contextScale;
     const centre = Cesium.Rectangle.center(Cesium.Rectangle.fromCartesianArray(positions));
     if (adaptive && blend > 0 && focusPositions !== positions) {
       const focus = Cesium.Rectangle.center(Cesium.Rectangle.fromCartesianArray(focusPositions));
