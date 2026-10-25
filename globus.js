@@ -88,7 +88,7 @@
         fadeMs: 220
       },
       passage: {
-        fill: Cesium.Color.fromCssColorString("#4C61D7"),
+        fill: Cesium.Color.fromCssColorString("#7E70EB"),
         alpha: 0.5,
         outline: null,
         fadeMs: 220
@@ -1733,6 +1733,7 @@
         }
         stylePolygonDataSource(ds, key, role, startedAt);
         registerRangeAreas(ds, key, item);
+        speciesRangeKeys.set(ds, key);
         if (!activeRangeDS.includes(ds)) activeRangeDS.push(ds);
         if (primaryKey && key === primaryKey && role !== 'outline') currentPrimaryPolygonDS = ds;
       }
@@ -1762,6 +1763,7 @@
           show: true
         });
         registerRangeSpot(point, e, pointKey);
+        speciesRangeKeys.set(point, pointKey);
       }
     }
   }
@@ -1842,6 +1844,7 @@
   }
 
   // One return view for the whole detail-panel session, including species changes.
+  const speciesRangeKeys = new WeakMap();
   let speciesReturnView = null;
   let speciesFlightToken = 0;
   let speciesResizeTimer = 0;
@@ -1884,35 +1887,86 @@
     return result;
   }
 
-  // Fit all vertices in a north-up tangent frame, using only the unobscured width.
-  // Move the camera east in the target tangent frame; keep a symmetric frustum.
-  // Looking parallel to the target normal places it beside the panel without clipping render passes.
-  function speciesDestination(positions, width, height, panelWidth, frustum, contextScale = 4) {
-    const rectangle = Cesium.Rectangle.fromCartesianArray(positions);
-    const centre = Cesium.Rectangle.center(rectangle);
+  // Group complete logical layers, never individual polygon pieces or holes.
+  function speciesRangeGroups() {
+    const groups = new Map();
+    const time = Cesium.JulianDate.now();
+    const add = (key, positions) => {
+      if (!groups.has(key)) groups.set(key, []);
+      const group = groups.get(key);
+      for (const position of positions || []) group.push(position);
+    };
+    const visit = (key, hierarchy) => {
+      if (!hierarchy) return;
+      add(key, hierarchy.positions);
+      for (const hole of hierarchy.holes || []) visit(key, hole);
+    };
+    for (const ds of activeRangeDS) {
+      const key = speciesRangeKeys.get(ds) || 'areas';
+      for (const entity of ds.entities.values) {
+        if (entity.polygon?.hierarchy) visit(key, entity.polygon.hierarchy.getValue(time));
+        if (entity.polyline?.positions) add(key, entity.polyline.positions.getValue(time));
+      }
+    }
+    for (let i = 0; i < rangePoints.length; i++) {
+      const point = rangePoints.get(i);
+      if (point.show && point.position) add(speciesRangeKeys.get(point) || 'spots', [point.position]);
+    }
+    return [...groups.values()].filter(group => group.length);
+  }
+
+  function speciesRangeExtent(positions) {
+    return positions.length > 1 ? Cesium.BoundingSphere.fromPoints(positions).radius * 2 : 0;
+  }
+
+  function speciesFocusPositions(groups, positions) {
+    const extent = speciesRangeExtent(positions);
+    // Only select a secondary layer when it is materially smaller than the union.
+    const smaller = groups.filter(group => speciesRangeExtent(group) < extent * 0.75);
+    return smaller.sort((a, b) => speciesRangeExtent(a) - speciesRangeExtent(b))[0] || positions;
+  }
+
+  // Symmetric projection avoids black strips in Cesium's ground render passes.
+  // An explicit contextScale retains the established genus framing.
+  function speciesDestination(positions, width, height, panelWidth, frustum, contextScale = null, focusPositions = positions) {
+    const extent = speciesRangeExtent(positions);
+    const adaptive = contextScale == null;
+    const progress = adaptive ? Cesium.Math.clamp((extent - 800000) / 4200000, 0, 1) : 0;
+    const blend = progress * progress * (3 - 2 * progress);
+    const scale = adaptive ? 4 + (0.65 - 4) * blend : contextScale;
+    const centre = Cesium.Rectangle.center(Cesium.Rectangle.fromCartesianArray(positions));
+    if (adaptive && blend > 0 && focusPositions !== positions) {
+      const focus = Cesium.Rectangle.center(Cesium.Rectangle.fromCartesianArray(focusPositions));
+      centre.longitude += Cesium.Math.negativePiToPi(focus.longitude - centre.longitude) * blend;
+      centre.latitude += (focus.latitude - centre.latitude) * blend;
+    }
     const frame = Cesium.Transforms.eastNorthUpToFixedFrame(
       Cesium.Cartesian3.fromRadians(centre.longitude, centre.latitude)
     );
     const inverse = Cesium.Matrix4.inverseTransformation(frame, new Cesium.Matrix4());
     const margin = Math.max(CONFIG.VIEW_MARGIN_PX, 32);
     const usableW = Math.max(20, width - panelWidth - 2 * margin);
-    // Equal top/bottom allowance also keeps geometry clear of the header.
     const usableH = Math.max(20, height - 128);
     const tanY = Math.tan(frustum.fovy / 2);
     const tanX = tanY * frustum.aspectRatio;
-    // Species use 4x framing distance; genera use 1.2x for a close fit.
     let altitude = CONFIG.ZOOM_IN_STOP_HEIGHT_M;
-    for (const position of positions) {
-      const local = Cesium.Matrix4.multiplyByPoint(inverse, position, new Cesium.Cartesian3());
-      altitude = Math.max(altitude,
-        local.z + Math.abs(local.x) / (tanX * usableW / width) * contextScale,
-        local.z + Math.abs(local.y) / (tanY * usableH / height) * contextScale);
-      // Keep distant vertices on the visible hemisphere as well as in the frame.
-      const normal = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(position, new Cesium.Cartesian3());
-      const up = Cesium.Matrix4.getColumn(frame, 2, new Cesium.Cartesian4());
-      const cosine = Cesium.Cartesian3.dot(normal, up);
-      if (cosine > .01) altitude = Math.max(altitude, 6378137 * (1 / cosine - 1) * 1.02);
-    }
+    const fit = (vertices, factor, horizon) => {
+      for (const position of vertices) {
+        const local = Cesium.Matrix4.multiplyByPoint(inverse, position, new Cesium.Cartesian3());
+        altitude = Math.max(altitude,
+          local.z + Math.abs(local.x) / (tanX * usableW / width) * factor,
+          local.z + Math.abs(local.y) / (tanY * usableH / height) * factor);
+        if (horizon) {
+          const normal = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(position, new Cesium.Cartesian3());
+          const up = Cesium.Matrix4.getColumn(frame, 2, new Cesium.Cartesian4());
+          const cosine = Cesium.Cartesian3.dot(normal, up);
+          if (cosine > .01) altitude = Math.max(altitude, 6378137 * (1 / cosine - 1) * 1.02);
+        }
+      }
+    };
+    // Large outer ranges may be cropped; the smaller focus layer must stay visible.
+    fit(positions, scale, !adaptive || blend === 0);
+    if (adaptive && blend > 0 && focusPositions !== positions) fit(focusPositions, 1.15, true);
     const eastOffset = altitude * tanX * panelWidth / Math.max(1, width);
     const destination = Cesium.Matrix4.multiplyByPoint(frame,
       new Cesium.Cartesian3(eastOffset, 0, altitude), new Cesium.Cartesian3());
@@ -1940,7 +1994,8 @@
     if (!positions.length) { if (openPanel) setPanelOpen(true); return; }
     const canvas = viewer.scene.canvas;
     const target = speciesDestination(positions, canvas.clientWidth, canvas.clientHeight,
-      DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum);
+      DOM.panelEl?.offsetWidth || 0, viewer.camera.frustum, null,
+      speciesFocusPositions(speciesRangeGroups(), positions));
     const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : SPECIES_FLIGHT_SECONDS;
     if (openPanel) setPanelOpen(true);
     viewer.camera.flyTo({ ...target,
