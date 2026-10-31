@@ -2185,3 +2185,23 @@ body.timeline-tooltip-active #species-tooltip { z-index: 1001 !important; pointe
 body.timeline-sheet-open { overflow: hidden; }
 
 @media (hover: hover) { #species-browser .tl-portrait:hover { outline: 3px solid #ff5100; } }
+
+/* One inset owner per text branch, including separately nested references. */
+@media (max-width: 860px) {
+  .info-panel .panel-content {
+    box-sizing: border-box !important;
+    padding-left: 0 !important; padding-right: 0 !important;
+  }
+  .info-panel .globe-panel-flow,
+  .info-panel .globe-panel-text {
+    padding-left: 0 !important; padding-right: 0 !important;
+  }
+  .info-panel .globe-panel-inset {
+    box-sizing: border-box !important;
+    width: 100% !important; max-width: 100% !important; min-width: 0 !important;
+    margin-left: 0 !important; margin-right: 0 !important;
+    padding-left: max(18px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(18px, env(safe-area-inset-right, 0px)) !important;
+  }
+  .info-panel :is(a, span).globe-panel-inset { display: block !important; }
+}
