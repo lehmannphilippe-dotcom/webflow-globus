@@ -2054,3 +2054,134 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
   body.globe-cards-view #globe-brand, body.globe-cards-view #globe-view-switch,
   body.globe-cards-view #globe-search:not(.is-open) { transition: none; }
 }
+
+/* Horizontal extinction timeline; no changes to the three existing card layouts. */
+#species-browser .tl-viewport, #species-browser .tl-scroll { display: none; }
+#species-browser.is-timeline { overflow: hidden; padding-left: 0; padding-right: 0; }
+#species-browser.is-timeline .gbv-content { display: none; }
+#species-browser.is-timeline .gbv-toolbar { margin-left: 16px; margin-right: 16px; }
+#species-browser.is-timeline .tl-viewport {
+  display: block; position: absolute; top: 190px; left: 40px; right: 24px; bottom: 100px;
+  overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+  scrollbar-width: none; touch-action: pan-x; -webkit-overflow-scrolling: touch;
+}
+#species-browser .tl-viewport::-webkit-scrollbar { display: none; }
+#species-browser .tl-track { display: flex; gap: 24px; align-items: stretch; width: max-content; min-width: 100%; height: max-content; }
+#species-browser .tl-century { flex: 0 0 auto; border-left: 2px solid #d9d9d9; padding-left: 12px; }
+#species-browser .tl-century-heading { display: flex; flex-direction: column; margin: 0; height: 61px; font: 800 32px/30px "Globe UI Inter", Inter, sans-serif; color: #fff; }
+#species-browser .tl-count { font: 400 16px/24px "Globe UI Inter", Inter, sans-serif; color: #7da1da; }
+#species-browser .tl-decades, #species-browser .tl-stacks { display: flex; align-items: flex-end; gap: 0; }
+#species-browser .tl-decades { gap: 3px; }
+#species-browser .tl-decade { flex: 0 0 auto; }
+#species-browser .tl-decade-heading { font: 800 18px/30px "Globe UI Inter", Inter, sans-serif; height: 30px; margin: 0; color: #fff; }
+#species-browser .tl-stack {
+  display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start;
+  width: 116px; height: calc(var(--tl-rows, 6) * 112px + 4px); padding: 8px; gap: 12px;
+  box-sizing: border-box; background: #1d214a;
+}
+#species-browser .tl-decade.is-empty .tl-decade-heading { color: #3f4c80; }
+#species-browser .tl-decade.is-empty .tl-stack { width: 48px; opacity: .7; }
+#species-browser .tl-portrait {
+  flex: 0 0 100px; width: 100px; height: 100px; display: block; padding: 0; margin: 0;
+  border: 0; border-radius: 50%; background: transparent; cursor: pointer; outline: 0 solid transparent;
+  transition: outline-color 150ms ease-out; -webkit-tap-highlight-color: transparent;
+}
+#species-browser .tl-portrait img { display: block; width: 100px; height: 100px; object-fit: cover; border-radius: 50%; }
+#species-browser .tl-portrait:focus-visible,
+#species-browser .tl-portrait[aria-pressed="true"] { outline: 3px solid #ff5100; }
+#species-browser.is-timeline .tl-scroll {
+  --tl-progress: 0%; display: block; position: absolute; left: 13%; bottom: 64px; width: 79%; height: 12px;
+  padding: 0; margin: 0; border: 0; border-radius: 50px; cursor: ew-resize;
+  appearance: none; -webkit-appearance: none;
+  background: #1f2552;
+}
+#species-browser .tl-scroll::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: var(--tl-thumb-width, 32px); height: 12px; border-radius: 50px; background: #fff; border: 0; }
+#species-browser .tl-scroll::-moz-range-thumb { width: var(--tl-thumb-width, 32px); height: 12px; border-radius: 50px; background: #fff; border: 0; }
+#species-browser .tl-scroll:disabled { opacity: 0; pointer-events: none; }
+#species-browser .tl-scroll:focus-visible { outline: 2px solid #ff5100; outline-offset: 6px; }
+body.timeline-tooltip-active #species-tooltip { z-index: 1001 !important; pointer-events: none !important; }
+.timeline-sheet { display: none; }
+.globe-panel-year-cross { display: none; }
+@media (max-width: 860px) {
+  #species-browser.is-timeline .tl-viewport { top: calc(180px + env(safe-area-inset-top, 0px)); left: 20px; right: 12px; bottom: max(40px, env(safe-area-inset-bottom, 0px)); }
+  #species-browser.is-timeline .tl-scroll { left: 20px; width: calc(100% - 40px); height: 6px; bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+  #species-browser.is-timeline .tl-scroll::-webkit-slider-thumb { height: 12px; }
+  .timeline-sheet { display: block; position: fixed; inset: 0; height: 100dvh; z-index: 1400; pointer-events: none; overflow: clip; }
+  .timeline-sheet .tl-preview {
+    position: absolute; top: 0; left: 0; right: 0; bottom: auto; height: calc(100% - var(--tl-preview-y)); box-sizing: border-box; padding: 18px;
+    border: 2px solid #ff5100; border-radius: 12px 12px 0 0; background: #121442;
+    transform: translate3d(0, var(--tl-preview-y), 0); pointer-events: auto; touch-action: none;
+    font-family: "Globe UI Inter", Inter, sans-serif; color: #fff; cursor: ns-resize; outline: none;
+  }
+  .tl-preview-name { font-size: 20px; font-weight: 600; line-height: 24px; margin-bottom: 4px; overflow-wrap: anywhere; }
+  .tl-preview-latin { font-size: 14px; font-weight: 500; line-height: 22px; color: #7da1da; }
+  .tl-preview-date { color: #ff5100; }
+  body.timeline-sheet-open .timeline-sheet #species-panel {
+    position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important;
+    max-width: 100% !important; max-height: 100% !important;
+    transform: translate3d(0, var(--tl-panel-y), 0) !important;
+    transition: none !important; pointer-events: auto !important;
+    border-radius: var(--tl-sheet-radius) var(--tl-sheet-radius) 0 0 !important;
+    background: #121442 !important; overflow: hidden !important; z-index: 1;
+  }
+  .timeline-sheet:not(.is-expanded) #species-panel .panel-content { overflow-y: hidden !important; touch-action: none; }
+  .timeline-sheet:not(.is-expanded) #species-panel > .globe-mobile-close { visibility: hidden !important; pointer-events: none !important; }
+  .timeline-sheet.is-expanded #species-panel .panel-content { overflow-y: auto !important; touch-action: pan-y; }
+  .timeline-sheet.is-settling .tl-preview,
+  body.timeline-sheet-open .timeline-sheet.is-settling #species-panel { transition: transform 280ms cubic-bezier(.2,.8,.2,1) !important; }
+  .info-panel .globe-panel-flow { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  .info-panel .globe-panel-text {
+    display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 15px !important;
+    padding: 15px max(18px, env(safe-area-inset-right, 0px)) 18px max(18px, env(safe-area-inset-left, 0px)) !important;
+    width: 100% !important; max-width: 100% !important;
+  }
+  .info-panel .globe-panel-copy-field, .info-panel .globe-panel-copy-field p,
+  .info-panel .globe-panel-copy-field li, .info-panel .globe-panel-copy-field a {
+    font-family: "Globe UI Inter", Inter, sans-serif !important;
+    font-size: 14px !important; font-weight: 400; line-height: 22px !important;
+    width: auto !important; max-width: 100% !important; min-width: 0 !important;
+    margin-left: 0 !important; margin-right: 0 !important;
+  }
+  .info-panel .globe-panel-copy-field:not(.globe-breadcrumb-item) { margin-top: 0 !important; margin-bottom: 0 !important; }
+  .info-panel .globe-panel-title {
+    font-family: "Globe UI Inter", Inter, sans-serif !important; font-weight: 600 !important;
+    font-size: 24px !important; line-height: 29px !important; width: auto !important;
+    min-width: 0 !important; max-width: 100% !important; height: auto !important;
+    margin: 0 !important; overflow-wrap: anywhere; hyphens: auto;
+  }
+  .info-panel .globe-panel-subheading {
+    font-family: "Globe UI Inter", Inter, sans-serif !important; font-weight: 600 !important;
+    font-size: 18px !important; line-height: 24px !important;
+    width: auto !important; max-width: 100% !important; min-width: 0 !important;
+    margin-top: 18px !important; margin-bottom: 0 !important;
+  }
+  .info-panel .globe-panel-text .globe-breadcrumb {
+    display: flex !important; flex-wrap: nowrap !important; margin: 0 !important;
+    font: 500 14px/22px "Globe UI Inter", Inter, sans-serif !important;
+  }
+  .info-panel .globe-panel-text .globe-breadcrumb > .globe-breadcrumb-item { padding-left: 8px !important; padding-right: 8px !important; font-weight: 500 !important; line-height: 22px !important; }
+  .info-panel .globe-panel-text .globe-breadcrumb > .globe-breadcrumb-item:first-child { padding-left: 0 !important; }
+  .info-panel .globe-panel-text .globe-breadcrumb > .globe-breadcrumb-item:last-child { padding-right: 0 !important; }
+  .info-panel .globe-panel-year-row { display: flex !important; align-items: center !important; gap: 4px !important; margin-top: 4px !important; width: auto !important; height: auto !important; }
+  .info-panel .globe-panel-year-row > :not(.globe-panel-year):not(.globe-panel-year-cross) { display: none !important; }
+  .info-panel .globe-panel-year-cross { display: block; flex: 0 0 auto; width: 13.9326px; height: 19px; }
+  .info-panel .globe-panel-year { font: 500 24px/29px "Globe UI Inter", Inter, sans-serif !important; color: #ff5100 !important; width: auto !important; height: auto !important; margin: 0 !important; }
+  #species-panel .panel-image-wrap #panel-image { width: 100% !important; aspect-ratio: 1; height: auto !important; object-fit: cover; }
+  #species-panel .panel-image-wrap #ai-image-info-button { right: 18px !important; bottom: 18px !important; }
+  .info-panel .globe-panel-text [id$="references-toggle"] { font-family: "Globe UI Inter", Inter, sans-serif !important; font-weight: 600 !important; font-size: 16px !important; line-height: 22px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timeline-sheet.is-settling .tl-preview,
+  body.timeline-sheet-open .timeline-sheet.is-settling #species-panel { transition: none !important; }
+}
+
+@media (max-width: 860px) {
+  .info-panel .globe-panel-title-block { display: flex !important; flex-direction: column !important; gap: 4px !important; width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  .info-panel .globe-panel-title-block .globe-panel-year-row { margin-top: 0 !important; }
+  .info-panel .globe-panel-text > .globe-panel-title + .globe-panel-year-row { margin-top: -11px !important; }
+  .timeline-sheet .tl-preview { font-size: 14px; line-height: 22px; }
+}
+
+body.timeline-sheet-open { overflow: hidden; }
+
+@media (hover: hover) { #species-browser .tl-portrait:hover { outline: 3px solid #ff5100; } }
