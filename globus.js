@@ -253,6 +253,34 @@
     }
   }
 
+  // Each text-only branch owns its inset once, including breadcrumbs beside the image.
+  function prepareMobileCopyInsets() {
+    for (const panel of [DOM.panelEl, DOM.genusPanel, DOM.familyPanel]) {
+      if (!panel) continue;
+      const scroller = panel.querySelector('.panel-content') || panel;
+      const protectedSelector = '#panel-image, .panel-image-wrap, #genus-cards, #family-cards, #family-ex-card, #genus-ex-card, .globe-mobile-close';
+      const fields = [...panel.querySelectorAll(
+        '.globe-panel-copy-field, .globe-panel-title, .globe-panel-subheading, .globe-breadcrumb, ' +
+        '[id$="references-toggle"], [id$="references-content"], [id$="references-list"], ' +
+        '#genus-family, #family-sticky-genus-link, #family-count, #genus-count, ' +
+        '#panel-extinction-date, #family-extinction-date, #genus-extinction-date'
+      )].filter(field => !field.closest('#genus-cards, #family-cards, #family-ex-card, #genus-ex-card'));
+      const branches = new Set();
+      for (const field of fields) {
+        if (!scroller.contains(field)) continue;
+        let branch = field;
+        while (branch.parentElement && branch.parentElement !== scroller &&
+          !branch.parentElement.matches(protectedSelector) &&
+          !branch.parentElement.querySelector(protectedSelector)) branch = branch.parentElement;
+        branches.add(branch);
+        for (let node = field; node && node !== scroller; node = node.parentElement) node.classList.add('globe-panel-flow');
+      }
+      for (const branch of branches) {
+        if (![...branches].some(other => other !== branch && other.contains(branch))) branch.classList.add('globe-mobile-copy-inset');
+      }
+    }
+  }
+
   const mobilePanelLayout = matchMedia('(max-width: 860px)');
   const mobileCloseOrigins = new Map();
   function prepareMobilePanelCloseButtons() {
@@ -278,6 +306,7 @@
   preparePanelTypography();
   prepareSpeciesBreadcrumb();
   preparePanelInsets();
+  prepareMobileCopyInsets();
   prepareMobilePanelCloseButtons();
 
 
