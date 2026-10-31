@@ -253,55 +253,6 @@
     }
   }
 
-  function prepareMobilePanelDate() {
-    const value = DOM.panelExtDate;
-    if (!value) return;
-    let row = value.parentElement;
-    if (!row || row.contains(DOM.panelNameDe)) {
-      row = document.createElement('div'); value.before(row); row.appendChild(value);
-    }
-    row.classList.add('globe-panel-year-row'); value.classList.add('globe-panel-year');
-    const icon = document.createElement('img'); icon.className = 'globe-panel-year-cross';
-    icon.src = 'data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjEzLjkzMjYiIGhlaWdodD0iMTkiIHZpZXdCb3g9IjAgMCAxMy45MzI2IDE5IiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cGF0aCBpZD0iVW5pb24iIGQ9Ik03LjgzMTA1IDBDOC4yNjQ4MiAwIDguNjE1OTYgMC4zMzg1ODMgOC42MTYyMSAwLjc1NjgzNlY0Ljc2MDc0SDEzLjE0NjVDMTMuNTgwNCA0Ljc2MDc0IDEzLjkzMTYgNS4xMDAxIDEzLjkzMTYgNS41MTg1NUgxMy45MzI2VjcuMTI1OThDMTMuOTMyNiA3LjU0NDQgMTMuNTgxNCA3Ljg4MjgxIDEzLjE0NzUgNy44ODI4MUg4LjYxNjIxVjE4LjI0MjJDOC42MTYyMSAxOC42NjA2IDguMjY0MTkgMTkgNy44MzEwNSAxOUg2LjE2NDA2QzUuNzMwMTUgMTkgNS4zNzg5MSAxOC42NjA2IDUuMzc4OTEgMTguMjQyMlY3Ljg4MjgxSDAuNzg1MTU2QzAuMzUxMzM3IDcuODgyNzMgMy44Njc1MWUtMDUgNy41NDQzNSAwIDcuMTI1OThWNS41MTg1NUMwIDUuMTAwMTUgMC4zNTEzMTMgNC43NjA4MiAwLjc4NTE1NiA0Ljc2MDc0SDUuMzc4OTFWMC43NTY4MzZDNS4zNzkxNSAwLjMzODU4MyA1LjczMDMgMCA2LjE2NDA2IDBINy44MzEwNVoiIGZpbGw9IiNGRjUxMDAiLz4KPC9zdmc+Cg=='; icon.width = 13.9326; icon.height = 19; icon.alt = '';
-    icon.setAttribute('aria-hidden', 'true'); row.insertBefore(icon, value);
-    let titleBlock = DOM.panelNameDe?.parentElement;
-    while (titleBlock && !titleBlock.contains(row)) titleBlock = titleBlock.parentElement;
-    if (titleBlock && titleBlock !== DOM.panelEl && !titleBlock.contains(DOM.panelDesc)) titleBlock.classList.add('globe-panel-title-block');
-  }
-
-  // Inset each text-only branch once, even when Webflow places copy beside an image
-  // or keeps the reference accordion outside the main copy wrapper.
-  function prepareMobileTextInsets() {
-    for (const panel of [DOM.panelEl, DOM.genusPanel, DOM.familyPanel]) {
-      if (!panel) continue;
-      const scroller = panel.querySelector('.panel-content') || panel;
-      const protectedSelector = '#panel-image, .panel-image-wrap, #genus-cards, #family-cards, #family-ex-card, #genus-ex-card, .globe-mobile-close';
-      const fields = [...panel.querySelectorAll(
-        '.globe-panel-copy-field, .globe-panel-title, .globe-panel-subheading, .globe-breadcrumb, ' +
-        '[id$="references-toggle"], [id$="references-content"], [id$="references-list"], ' +
-        '#genus-family, #family-sticky-genus-link, #family-count, #genus-count, ' +
-        '#panel-extinction-date, #family-extinction-date, #genus-extinction-date'
-      )].filter(field => !field.closest('#genus-cards, #family-cards, #family-ex-card, #genus-ex-card'));
-      const branches = new Set();
-      for (const field of fields) {
-        if (!scroller.contains(field)) continue;
-        let branch = field;
-        while (branch.parentElement && branch.parentElement !== scroller &&
-          !branch.parentElement.matches(protectedSelector) &&
-          !branch.parentElement.querySelector(protectedSelector)) branch = branch.parentElement;
-        branches.add(branch);
-        for (let node = field; node && node !== scroller; node = node.parentElement) {
-          node.classList.add('globe-panel-flow');
-        }
-      }
-      for (const branch of branches) {
-        if (![...branches].some(other => other !== branch && other.contains(branch))) {
-          branch.classList.add('globe-panel-inset');
-        }
-      }
-    }
-  }
-
   const mobilePanelLayout = matchMedia('(max-width: 860px)');
   const mobileCloseOrigins = new Map();
   function prepareMobilePanelCloseButtons() {
@@ -327,9 +278,7 @@
   preparePanelTypography();
   prepareSpeciesBreadcrumb();
   preparePanelInsets();
-  prepareMobilePanelDate();
   prepareMobilePanelCloseButtons();
-  prepareMobileTextInsets();
 
 
   // =========================================================
@@ -2620,7 +2569,6 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function finalizeSecondaryPanel(panelEl, cardsEl, genusItems = []) {
-    teardownTimelineSheet();
     closeSecondaryPanels();
     resetPanelScroll(panelEl);
     if (cardsEl) cardsEl.scrollLeft = 0;
@@ -2640,7 +2588,6 @@ function renderFamilyCards(speciesList = []) {
   }
 
   async function openSpeciesFromCard(item) {
-    if (!timelinePreparingSheet) teardownTimelineSheet();
     if (!item) return;
 
     hideGenusCardMapImage(null, true);
@@ -2660,7 +2607,6 @@ function renderFamilyCards(speciesList = []) {
     resetPanelScroll(DOM.familyPanel);
     resetCardRailScroll();
     if (activeView === 'cards') {
-      if (timelinePreparingSheet) return;
       overviewReturnFocus = document.activeElement && overview.contains(document.activeElement) ? document.activeElement : null;
       setPanelOpen(true);
       return;
@@ -2712,7 +2658,6 @@ function renderFamilyCards(speciesList = []) {
   }
 
   async function closeAllPanels(immediateCameraReturn = false) {
-    teardownTimelineSheet(); timelineHideTooltip();
     ++speciesFlightToken;
     viewer.camera.cancelFlight();
     closeSecondaryPanels();
@@ -3405,9 +3350,6 @@ function renderFamilyCards(speciesList = []) {
 
   async function renderOverview(animate = true, resetScroll = true) {
     if (!overviewDataReady || activeView !== 'cards') return;
-    if (overviewSort === 'year') return renderTimeline(animate, resetScroll);
-    teardownTimelineSheet(); timelineHideTooltip();
-    overview.classList.remove('is-timeline');
     if (!DOM.speciesCardTemplate) {
       overviewStatus.textContent = 'Die bestehende Webflow-Kartenvorlage #species-card-template fehlt.';
       return;
@@ -3650,329 +3592,6 @@ function renderFamilyCards(speciesList = []) {
     if (event.propertyName === 'top' && event.target.classList.contains('gbv-heading') && !overviewScrollFrame) {
       overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
     }
-  });
-  // Extinction timeline: an independent year layout; other card sorts stay intact.
-  function timelineExactYear(item) {
-    const value = String(item.extinction_date || item.last_seen || '').trim();
-    return /^\d{3,4}$/.test(value) && Number(value) > 0 ? Number(value) : null;
-  }
-
-  function timelineGroups(items) {
-    const valid = items.filter(item => overviewRegions(item).length && timelineExactYear(item) !== null);
-    const compare = (a, b) => Number(/\bsp\./i.test(a.name?.lat || '')) - Number(/\bsp\./i.test(b.name?.lat || '')) ||
-      timelineExactYear(a) - timelineExactYear(b) || overviewCollator.compare(overviewName(a), overviewName(b));
-    const result = [];
-    const early = valid.filter(item => timelineExactYear(item) < 1800).sort(compare);
-    if (early.length) result.push({ label: '1000–1700', count: early.length, decades: [{ year: null, items: early }] });
-    const latest = Math.max(1799, ...valid.map(timelineExactYear));
-    for (let century = 1800; century <= latest; century += 100) {
-      const decades = Array.from({ length: 10 }, (_, index) => {
-        const year = century + index * 10;
-        return { year, items: valid.filter(item => {
-          const value = timelineExactYear(item);
-          return value >= year && value < year + 10;
-        }).sort(compare) };
-      });
-      result.push({ label: String(century), count: decades.reduce((sum, group) => sum + group.items.length, 0), decades });
-    }
-    return result;
-  }
-
-  const timelineViewport = document.createElement('div');
-  timelineViewport.className = 'tl-viewport';
-  timelineViewport.tabIndex = 0;
-  timelineViewport.setAttribute('aria-label', 'Aussterbejahre – horizontal scrollbare Zeitleiste');
-  const timelineTrack = document.createElement('div');
-  timelineTrack.className = 'tl-track';
-  timelineViewport.appendChild(timelineTrack);
-  const timelineScrollbar = document.createElement('input');
-  timelineScrollbar.type = 'range'; timelineScrollbar.className = 'tl-scroll';
-  timelineScrollbar.min = '0'; timelineScrollbar.max = '0'; timelineScrollbar.value = '0'; timelineScrollbar.step = '1';
-  timelineScrollbar.setAttribute('aria-label', 'Zeitleiste horizontal verschieben');
-  overview.append(timelineViewport, timelineScrollbar);
-  let timelineRows = 6;
-  let timelineRendered = false;
-  let timelineRenderFrame = 0;
-  let timelinePreparingSheet = false;
-  let timelineSheetState = null;
-  let timelineSheetToken = 0;
-  const timelinePortraitItems = new WeakMap();
-  let timelineSelectedButton = null;
-
-  function timelineHideTooltip() {
-    document.body.classList.remove('timeline-tooltip-active');
-    hideTooltip();
-  }
-
-  function timelineUpdateScrollbar() {
-    const max = Math.max(0, timelineViewport.scrollWidth - timelineViewport.clientWidth);
-    timelineScrollbar.max = String(max);
-    timelineScrollbar.value = String(Math.min(max, timelineViewport.scrollLeft));
-    timelineScrollbar.disabled = max < 1;
-    const top = timelineViewport.getBoundingClientRect().top - overview.getBoundingClientRect().top;
-    timelineScrollbar.style.top = `${Math.min(innerHeight - (innerWidth <= 860 ? 24 : 64), top + timelineTrack.offsetHeight + (innerWidth <= 860 ? 24 : 36))}px`;
-    timelineScrollbar.style.bottom = 'auto';
-    timelineScrollbar.style.setProperty('--tl-thumb-width', `${Math.max(32, timelineScrollbar.clientWidth * timelineViewport.clientWidth / Math.max(1, timelineViewport.scrollWidth))}px`);
-    timelineScrollbar.style.setProperty('--tl-progress', `${max ? 100 * timelineViewport.scrollLeft / max : 0}%`);
-    timelineScrollbar.setAttribute('aria-valuetext', `${Math.round(max ? 100 * timelineViewport.scrollLeft / max : 0)} Prozent`);
-  }
-
-  function timelineSetSelected(button) {
-    timelineSelectedButton?.setAttribute('aria-pressed', 'false');
-    timelineSelectedButton = button || null;
-    timelineSelectedButton?.setAttribute('aria-pressed', 'true');
-  }
-
-  function timelinePortrait(item) {
-    const button = document.createElement('button');
-    button.type = 'button'; button.className = 'tl-portrait';
-    button.setAttribute('aria-label', `${overviewName(item)} – ${timelineExactYear(item)} – Art öffnen`);
-    button.setAttribute('aria-pressed', 'false');
-    const image = document.createElement('img');
-    image.alt = ''; image.width = 100; image.height = 100;
-    image.loading = 'lazy'; image.decoding = 'async';
-    const source = item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG;
-    if (source) U.setWFImage(image, source);
-    image.addEventListener('error', () => {
-      if (CONFIG.DEFAULT_TOOLTIP_IMG && image.getAttribute('src') !== CONFIG.DEFAULT_TOOLTIP_IMG) U.setWFImage(image, CONFIG.DEFAULT_TOOLTIP_IMG);
-    }, { once: true });
-    button.appendChild(image);
-    timelinePortraitItems.set(button, item);
-    const hover = event => {
-      if (innerWidth <= 860 || event.pointerType === 'touch') return;
-      const rect = button.getBoundingClientRect();
-      pointer.x = event.clientX ?? rect.left; pointer.y = event.clientY ?? rect.bottom;
-      document.body.classList.add('timeline-tooltip-active');
-      showTooltip({ ...item, last_seen: String(timelineExactYear(item)) });
-    };
-    button.addEventListener('pointerenter', hover);
-    button.addEventListener('pointermove', hover);
-    button.addEventListener('focus', hover);
-    button.addEventListener('pointerleave', timelineHideTooltip);
-    button.addEventListener('blur', timelineHideTooltip);
-    button.addEventListener('click', event => {
-      event.stopPropagation(); timelineHideTooltip();
-      if (innerWidth <= 860) void openTimelineSheet(item, button);
-      else { timelineSetSelected(button); void openSpeciesFromCard(item); }
-    });
-    if (timelineSheetState?.item === item) {
-      timelineSetSelected(button);
-      timelineSheetState.button = button;
-    }
-    return button;
-  }
-
-  function timelineBuildTrack() {
-    timelineHideTooltip();
-    const oldScroll = timelineViewport.scrollLeft;
-    const usableHeight = timelineViewport.clientHeight - 92;
-    timelineRows = Math.max(2, Math.min(6, Math.floor((usableHeight + 12) / 112)));
-    timelineTrack.style.setProperty('--tl-rows', timelineRows);
-    const groups = timelineGroups(ALL);
-    const fragment = document.createDocumentFragment();
-    for (const group of groups) {
-      const section = document.createElement('section'); section.className = 'tl-century';
-      const heading = document.createElement('h2'); heading.className = 'tl-century-heading';
-      const title = document.createElement('span'); title.textContent = group.label;
-      const count = document.createElement('span'); count.className = 'tl-count';
-      count.textContent = `${group.count} ${group.count === 1 ? 'Art/Form' : 'Arten/Formen'}`;
-      heading.append(title, count); section.appendChild(heading);
-      const columns = document.createElement('div'); columns.className = 'tl-decades';
-      for (const decade of group.decades) {
-        const decadeEl = document.createElement('div'); decadeEl.className = 'tl-decade';
-        decadeEl.classList.toggle('is-empty', decade.items.length === 0);
-        const label = document.createElement('h3'); label.className = 'tl-decade-heading';
-        label.textContent = decade.year === null ? '' : String(decade.year);
-        if (decade.year === null) label.setAttribute('aria-hidden', 'true');
-        decadeEl.appendChild(label);
-        const stackGroup = document.createElement('div'); stackGroup.className = 'tl-stacks';
-        const chunks = Math.max(1, Math.ceil(decade.items.length / timelineRows));
-        for (let index = 0; index < chunks; index++) {
-          const stack = document.createElement('div'); stack.className = 'tl-stack';
-          for (const item of decade.items.slice(index * timelineRows, (index + 1) * timelineRows)) stack.appendChild(timelinePortrait(item));
-          stackGroup.appendChild(stack);
-        }
-        decadeEl.appendChild(stackGroup); columns.appendChild(decadeEl);
-      }
-      section.appendChild(columns); fragment.appendChild(section);
-    }
-    timelineTrack.replaceChildren(fragment);
-    timelineViewport.scrollLeft = oldScroll;
-    timelineUpdateScrollbar();
-    const count = groups.reduce((sum, group) => sum + group.count, 0);
-    overviewStatus.textContent = count ? `${count} Arten/Formen aus Hawaii mit eindeutigem Aussterbejahr.` : 'Keine Hawaii-Arten mit eindeutigem Aussterbejahr vorhanden.';
-    overviewStatus.classList.toggle('is-sr-only', count > 0);
-  }
-
-  async function renderTimeline(animate, resetScroll) {
-    ++overviewRenderToken;
-    overviewImageObserver?.disconnect(); stopOverviewCardReveal();
-    overview.classList.add('is-timeline');
-    overview.classList.remove('has-alphabet'); overviewAlphabet.hidden = true;
-    overviewGroupsOnScreen = []; overviewContent.replaceChildren();
-    overviewContent.setAttribute('aria-busy', 'false');
-    overviewRenderedSort = 'year'; timelineRendered = true;
-    setOverviewHeaderHidden(false);
-    if (resetScroll) { overview.scrollTop = 0; timelineViewport.scrollLeft = 0; }
-    timelineBuildTrack();
-  }
-
-  timelineScrollbar.addEventListener('input', () => { timelineHideTooltip(); timelineViewport.scrollLeft = Number(timelineScrollbar.value); });
-  timelineViewport.addEventListener('scroll', () => { timelineHideTooltip(); timelineUpdateScrollbar(); }, { passive: true });
-  timelineViewport.addEventListener('wheel', event => {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || event.ctrlKey || event.metaKey) return;
-    const max = timelineViewport.scrollWidth - timelineViewport.clientWidth;
-    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? timelineViewport.clientWidth : 1);
-    if ((delta < 0 && timelineViewport.scrollLeft > 0) || (delta > 0 && timelineViewport.scrollLeft < max)) {
-      event.preventDefault(); timelineViewport.scrollLeft += delta;
-    }
-  }, { passive: false });
-  const timelineResizeObserver = new ResizeObserver(() => {
-    if (!timelineRendered || activeView !== 'cards' || overviewSort !== 'year' || timelineRenderFrame) return;
-    timelineRenderFrame = requestAnimationFrame(() => { timelineRenderFrame = 0; timelineBuildTrack(); if (timelineSheetState) timelineSetProgress(timelineSheetState.progress); });
-  });
-  timelineResizeObserver.observe(timelineViewport);
-
-  // The preview remains a separate surface. The original detail panel progressively covers it.
-  function timelineSetProgress(progress) {
-    const state = timelineSheetState;
-    if (!state) return;
-    state.progress = Math.max(-0.3, Math.min(1, progress));
-    const height = innerHeight;
-    const date = state.preview.querySelector('.tl-preview-date');
-    const compactHeight = Math.max(101, date.offsetTop + date.offsetHeight + 18);
-    const peek = Math.min(Math.max(182, compactHeight + 60), height * .6);
-    state.dragDistance = Math.max(180, height - peek);
-    const previewY = (height - peek) * (1 - state.progress);
-    const gap = compactHeight * Math.pow(Math.max(0, 1 - state.progress), .6);
-    state.host.style.setProperty('--tl-preview-y', `${previewY}px`);
-    state.host.style.setProperty('--tl-panel-y', `${previewY + gap}px`);
-    state.host.style.setProperty('--tl-sheet-radius', `${12 * (1 - Math.max(0, state.progress))}px`);
-    state.host.classList.toggle('is-expanded', state.progress >= .999);
-    state.preview.setAttribute('aria-expanded', String(state.progress > .5));
-    state.preview.setAttribute('aria-hidden', String(state.progress >= .999));
-    if (state.progress < .999) state.preview.removeAttribute('inert');
-    else state.preview.setAttribute('inert', '');
-    if (state.progress >= .999) DOM.panelEl.removeAttribute('inert');
-    else DOM.panelEl.setAttribute('inert', '');
-  }
-
-  function timelineSnapSheet(progress) {
-    if (!timelineSheetState) return;
-    const state = timelineSheetState;
-    state.host.classList.add('is-settling');
-    timelineSetProgress(progress);
-    clearTimeout(state.settleTimer);
-    state.settleTimer = setTimeout(() => {
-      if (timelineSheetState !== state) return;
-      state.host.classList.remove('is-settling');
-      if (state.progress >= .999) DOM.panelCloseBtn?.focus({ preventScroll: true });
-      else if (state.host.contains(document.activeElement)) state.preview.focus({ preventScroll: true });
-    }, overviewReducedMotion() ? 0 : 280);
-  }
-
-  function teardownTimelineSheet() {
-    ++timelineSheetToken;
-    const state = timelineSheetState;
-    if (!state) return;
-    timelineSheetState = null;
-    clearTimeout(state.settleTimer);
-    state.origin.after(DOM.panelEl); state.origin.remove(); state.host.remove();
-    DOM.panelEl.removeAttribute('inert'); DOM.panelEl.removeAttribute('aria-hidden');
-    document.body.classList.remove('timeline-sheet-open');
-    timelineSetSelected(null);
-    overview.removeAttribute('inert');
-    state.button?.isConnected && state.button.focus({ preventScroll: true });
-  }
-
-  async function openTimelineSheet(item, button) {
-    if (!DOM.panelEl || !innerWidth || innerWidth > 860) return;
-    const token = ++timelineSheetToken;
-    timelinePreparingSheet = true;
-    try { await openSpeciesFromCard(item); } finally { timelinePreparingSheet = false; }
-    if (token !== timelineSheetToken || activeView !== 'cards' || overviewSort !== 'year') return;
-    timelineSetSelected(button);
-    if (!timelineSheetState) {
-      const host = document.createElement('section'); host.className = 'timeline-sheet';
-      host.setAttribute('aria-label', 'Artvorschau und Artpanel');
-      const preview = document.createElement('div'); preview.className = 'tl-preview';
-      preview.tabIndex = 0; preview.setAttribute('role', 'button');
-      preview.setAttribute('aria-label', 'Artpanel nach oben öffnen');
-      preview.innerHTML = '<div class="tl-preview-name"></div><div class="tl-preview-latin"></div><div class="tl-preview-date"><span></span></div>';
-      host.appendChild(preview);
-      const origin = document.createComment('species panel before timeline sheet');
-      DOM.panelEl.before(origin); host.appendChild(DOM.panelEl); document.body.appendChild(host);
-      timelineSheetState = { host, preview, origin, item, button, progress: 0, gesture: null, settleTimer: 0 };
-      timelineBindSheetGestures(host, preview);
-    }
-    const state = timelineSheetState; state.item = item; state.button = button;
-    state.preview.querySelector('.tl-preview-name').textContent = item.name.de;
-    state.preview.querySelector('.tl-preview-latin').textContent = item.name.lat;
-    const date = state.preview.querySelector('.tl-preview-date span');
-    date.textContent = timelineExactYear(item); normalizeExtinctionDate(date);
-    document.body.classList.add('timeline-sheet-open');
-    overviewReturnFocus = button;
-    timelineSetProgress(0);
-    state.preview.focus({ preventScroll: true });
-  }
-
-  function timelineBindSheetGestures(host, preview) {
-    const start = (y, target) => {
-      const state = timelineSheetState;
-      if (!state || target.closest('button, a, input, select, textarea')) return false;
-      state.host.classList.remove('is-settling');
-      const scroll = DOM.panelEl.querySelector('.panel-content')?.scrollTop || 0;
-      state.gesture = { y, progress: state.progress, time: performance.now(), scroll, moved: false, dragging: false };
-      return true;
-    };
-    const move = (y, event) => {
-      const state = timelineSheetState, gesture = state?.gesture;
-      if (!gesture) return;
-      const delta = y - gesture.y;
-      if (!gesture.dragging && gesture.progress >= .999 && (gesture.scroll > 0 || delta < 0)) return;
-      if (Math.abs(delta) < 6 && !gesture.dragging) return;
-      gesture.dragging = true; gesture.moved = true;
-      if (event.cancelable) event.preventDefault();
-      timelineSetProgress(gesture.progress - delta / state.dragDistance);
-    };
-    const end = y => {
-      const state = timelineSheetState, gesture = state?.gesture;
-      if (!gesture) return;
-      state.gesture = null;
-      if (!gesture.moved) return;
-      const velocity = (y - gesture.y) / Math.max(1, performance.now() - gesture.time);
-      if (state.progress < -.12 || (state.progress < .15 && velocity > .6)) { void closeAllPanels(); return; }
-      let snap = [0, .55, 1].sort((a, b) => Math.abs(a - state.progress) - Math.abs(b - state.progress))[0];
-      if (velocity < -.5) snap = state.progress < .4 ? .55 : 1;
-      if (velocity > .5) snap = state.progress > .65 ? .55 : 0;
-      timelineSnapSheet(snap);
-      state.suppressClick = true;
-      setTimeout(() => { state.suppressClick = false; }, 0);
-    };
-    host.addEventListener('pointerdown', event => {
-      if (event.pointerType === 'touch' || event.button !== 0) return;
-      if (start(event.clientY, event.target)) host.setPointerCapture(event.pointerId);
-    });
-    host.addEventListener('pointermove', event => { if (event.pointerType !== 'touch') move(event.clientY, event); });
-    host.addEventListener('pointerup', event => { if (event.pointerType !== 'touch') end(event.clientY); });
-    host.addEventListener('pointercancel', () => { if (timelineSheetState) { timelineSheetState.gesture = null; timelineSnapSheet(timelineSheetState.progress < .3 ? 0 : timelineSheetState.progress < .8 ? .55 : 1); } });
-    host.addEventListener('touchstart', event => { if (event.touches.length === 1) start(event.touches[0].clientY, event.target); }, { passive: true });
-    host.addEventListener('touchmove', event => { if (event.touches.length === 1) move(event.touches[0].clientY, event); }, { passive: false });
-    host.addEventListener('touchend', event => { if (event.changedTouches.length) end(event.changedTouches[0].clientY); });
-    host.addEventListener('touchcancel', () => {
-      if (timelineSheetState) { timelineSheetState.gesture = null; timelineSnapSheet(timelineSheetState.progress < .3 ? 0 : timelineSheetState.progress < .8 ? .55 : 1); }
-    });
-    preview.addEventListener('click', () => { if (!timelineSheetState?.suppressClick) timelineSnapSheet(timelineSheetState?.progress < .4 ? .55 : 1); });
-    preview.addEventListener('keydown', event => {
-      if (['Enter', ' ', 'ArrowUp'].includes(event.key)) { event.preventDefault(); timelineSnapSheet(timelineSheetState?.progress < .4 ? .55 : 1); }
-      if (event.key === 'ArrowDown') { event.preventDefault(); timelineSheetState?.progress > .3 ? timelineSnapSheet(0) : void closeAllPanels(); }
-    });
-    host.addEventListener('click', event => event.stopPropagation());
-  }
-
-  addEventListener('resize', () => {
-    if (innerWidth > 860 && timelineSheetState) void closeAllPanels(true);
-    if (timelineSheetState) timelineSetProgress(timelineSheetState.progress);
   });
 
   const searchRoot = document.createElement('section');
