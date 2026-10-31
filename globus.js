@@ -229,55 +229,44 @@
     row.replaceChildren(...fields); // Keep the original links and their event listeners.
   }
 
-  function preparePanelInsets() {
-    const panels = [
-      [DOM.panelEl, [DOM.panelFamilyLink, DOM.panelNameDe, DOM.panelDesc, DOM.panelHabitat, DOM.panelExtinction]],
-      [DOM.genusPanel, [DOM.genusNameDe, DOM.genusNameLat, DOM.genusDesc]],
-      [DOM.familyPanel, [DOM.familyNameDe, DOM.familyNameLat, DOM.familyDesc]]
-    ];
-    for (const [panel, candidates] of panels) {
-      const fields = candidates.filter(Boolean);
-      if (!panel || !fields.length) continue;
-      let copy = fields[0].parentElement;
-      while (copy && !fields.every(field => copy.contains(field))) copy = copy.parentElement;
-      if (copy && copy !== panel && !copy.contains(DOM.panelImg)) copy.classList.add('globe-panel-text');
-      for (const field of fields) {
-        field.classList.add('globe-panel-copy-field');
-        for (let node = field.parentElement; node && node !== panel; node = node.parentElement) {
-          if (!node.classList.contains('globe-breadcrumb')) node.classList.add('globe-panel-flow');
-        }
-      }
-    }
-    for (let node = DOM.panelImg?.parentElement; node && node !== DOM.panelEl; node = node.parentElement) {
-      node.classList.add('globe-panel-flow');
-    }
-  }
-
-  // Each text-only branch owns its inset once, including breadcrumbs beside the image.
-  function prepareMobileCopyInsets() {
+  // Classify the existing Webflow nodes once; preserve their structure and listeners.
+  function preparePanelLayout() {
+    const excluded = '#panel-image, .panel-image-wrap, #genus-cards, #family-cards, #family-ex-card, #genus-ex-card, #family-sticky-genus-link, .globe-mobile-close';
+    const fieldSelector = '.globe-panel-title, .globe-panel-subheading, .globe-breadcrumb, ' +
+      '#panel-description, #panel-habitat, #panel-extinction, #genus-description, #family-description, ' +
+      '#genus-family, #family-count, #genus-count, ' +
+      '#panel-extinction-date, #genus-extinction-date, #family-extinction-date, ' +
+      '[id$="references-toggle"], [id$="references-content"], [id$="references-list"]';
     for (const panel of [DOM.panelEl, DOM.genusPanel, DOM.familyPanel]) {
       if (!panel) continue;
       const scroller = panel.querySelector('.panel-content') || panel;
-      const protectedSelector = '#panel-image, .panel-image-wrap, #genus-cards, #family-cards, #family-ex-card, #genus-ex-card, .globe-mobile-close';
-      const fields = [...panel.querySelectorAll(
-        '.globe-panel-copy-field, .globe-panel-title, .globe-panel-subheading, .globe-breadcrumb, ' +
-        '[id$="references-toggle"], [id$="references-content"], [id$="references-list"], ' +
-        '#genus-family, #family-sticky-genus-link, #family-count, #genus-count, ' +
-        '#panel-extinction-date, #family-extinction-date, #genus-extinction-date'
-      )].filter(field => !field.closest('#genus-cards, #family-cards, #family-ex-card, #genus-ex-card'));
       const branches = new Set();
-      for (const field of fields) {
-        if (!scroller.contains(field)) continue;
+      for (const field of panel.querySelectorAll(fieldSelector)) {
+        if (!scroller.contains(field) || field.closest(excluded)) continue;
+        field.classList.add('globe-panel-field');
         let branch = field;
         while (branch.parentElement && branch.parentElement !== scroller &&
-          !branch.parentElement.matches(protectedSelector) &&
-          !branch.parentElement.querySelector(protectedSelector)) branch = branch.parentElement;
+          !branch.parentElement.matches(excluded) && !branch.parentElement.querySelector(excluded)) {
+          branch = branch.parentElement;
+        }
         branches.add(branch);
-        for (let node = field; node && node !== scroller; node = node.parentElement) node.classList.add('globe-panel-flow');
+        for (let node = field; node && node !== scroller; node = node.parentElement) {
+          node.classList.add('globe-panel-layout-path');
+        }
       }
       for (const branch of branches) {
-        if (![...branches].some(other => other !== branch && other.contains(branch))) branch.classList.add('globe-mobile-copy-inset');
+        if (![...branches].some(other => other !== branch && other.contains(branch))) {
+          branch.classList.add('globe-panel-inset');
+        }
       }
+      for (const prose of panel.querySelectorAll(
+        '#panel-description, #panel-habitat, #panel-extinction, #genus-description, #family-description, [id$="references-list"]'
+      )) prose.classList.add('globe-panel-prose');
+    }
+    // The image follows the full panel width, independently of the text branches.
+    for (let node = DOM.panelImg?.parentElement; node && node !== DOM.panelEl &&
+      !node.classList.contains('panel-content'); node = node.parentElement) {
+      node.classList.add('globe-panel-media-path');
     }
   }
 
@@ -305,9 +294,8 @@
 
   preparePanelTypography();
   prepareSpeciesBreadcrumb();
-  preparePanelInsets();
-  prepareMobileCopyInsets();
   prepareMobilePanelCloseButtons();
+  preparePanelLayout();
 
 
   // =========================================================
