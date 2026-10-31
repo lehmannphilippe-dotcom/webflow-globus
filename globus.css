@@ -2054,3 +2054,16 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
   body.globe-cards-view #globe-brand, body.globe-cards-view #globe-view-switch,
   body.globe-cards-view #globe-search:not(.is-open) { transition: none; }
 }
+
+/* Mobile panel: equal text insets, independently of Webflow wrapper nesting. */
+@media (max-width: 860px) {
+  .info-panel .panel-content { box-sizing: border-box !important; padding-left: 0 !important; padding-right: 0 !important; }
+  .info-panel .globe-panel-flow, .info-panel .globe-panel-text { padding-left: 0 !important; padding-right: 0 !important; }
+  .info-panel .globe-mobile-copy-inset {
+    box-sizing: border-box !important; width: 100% !important; min-width: 0 !important; max-width: 100% !important;
+    margin-left: 0 !important; margin-right: 0 !important;
+    padding-left: max(24px, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(24px, env(safe-area-inset-right, 0px)) !important;
+  }
+  .info-panel :is(a, span).globe-mobile-copy-inset { display: block !important; }
+}
