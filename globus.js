@@ -229,67 +229,34 @@
     row.replaceChildren(...fields); // Keep the original links and their event listeners.
   }
 
-  // Classify the existing Webflow nodes once; preserve their structure and listeners.
+  // Webflow owns the panel structure. Only direct text sections receive mobile insets.
   function preparePanelLayout() {
-    const excluded = '#panel-image, .panel-image-wrap, #genus-cards, #family-cards, #family-ex-card, #genus-ex-card, #family-sticky-genus-link, .globe-mobile-close';
-    const fieldSelector = '.globe-panel-title, .globe-panel-subheading, .globe-breadcrumb, ' +
-      '#panel-description, #panel-habitat, #panel-extinction, #genus-description, #family-description, ' +
-      '#genus-family, #family-count, #genus-count, ' +
-      '#panel-extinction-date, #genus-extinction-date, #family-extinction-date, ' +
-      '[id$="references-toggle"], [id$="references-content"], [id$="references-list"]';
+    const sections = '.tree, .heading-6, .heading-7, .extinction, .paragraph-4, ' +
+      '.last-paragraph, .references-accordion, #genus-count, #family-count';
     for (const panel of [DOM.panelEl, DOM.genusPanel, DOM.familyPanel]) {
-      if (!panel) continue;
-      const scroller = panel.querySelector('.panel-content') || panel;
-      const branches = new Set();
-      for (const field of panel.querySelectorAll(fieldSelector)) {
-        if (!scroller.contains(field) || field.closest(excluded)) continue;
-        field.classList.add('globe-panel-field');
-        let branch = field;
-        while (branch.parentElement && branch.parentElement !== scroller &&
-          !branch.parentElement.matches(excluded) && !branch.parentElement.querySelector(excluded)) {
-          branch = branch.parentElement;
-        }
-        branches.add(branch);
-        for (let node = field; node && node !== scroller; node = node.parentElement) {
-          node.classList.add('globe-panel-layout-path');
-        }
+      const scroller = panel?.querySelector('.panel-content');
+      if (!scroller) continue;
+      for (const section of scroller.children) {
+        if (section.matches(sections)) section.classList.add('globe-panel-inset');
       }
-      for (const branch of branches) {
-        if (![...branches].some(other => other !== branch && other.contains(branch))) {
-          branch.classList.add('globe-panel-inset');
-        }
-      }
-      for (const prose of panel.querySelectorAll(
+      for (const prose of scroller.querySelectorAll(
         '#panel-description, #panel-habitat, #panel-extinction, #genus-description, #family-description, [id$="references-list"]'
       )) prose.classList.add('globe-panel-prose');
     }
-    // The image follows the full panel width, independently of the text branches.
-    for (let node = DOM.panelImg?.parentElement; node && node !== DOM.panelEl &&
-      !node.classList.contains('panel-content'); node = node.parentElement) {
-      node.classList.add('globe-panel-media-path');
-    }
   }
 
-  const mobilePanelLayout = matchMedia('(max-width: 860px)');
-  const mobileCloseOrigins = new Map();
+  // Panel controls are root children in Webflow; no reparenting is necessary.
   function prepareMobilePanelCloseButtons() {
-    const buttons = document.querySelectorAll('#panel-close, .panel-close, #family-close, #genus-close, #ai-image-modal-close');
-    for (const button of buttons) {
-      if (!mobileCloseOrigins.has(button)) {
-        const marker = document.createComment('original close button position');
-        button.before(marker);
-        mobileCloseOrigins.set(button, marker);
-        button.classList.add('globe-mobile-close');
-      }
-      if (mobilePanelLayout.matches) {
-        const host = button.closest('.info-panel, .ai-image-modal');
-        if (host && button.parentElement !== host) host.appendChild(button);
-      } else {
-        const marker = mobileCloseOrigins.get(button);
-        if (marker.parentNode && button.previousSibling !== marker) marker.after(button);
-      }
+    for (const button of document.querySelectorAll('#panel-close, #family-close, #genus-close, #ai-image-modal-close')) {
+      button.classList.add('globe-mobile-close');
     }
+    // Only the generated AI modal needs a different close-button host on mobile.
+    const modal = document.getElementById('ai-image-modal');
+    const close = document.getElementById('ai-image-modal-close');
+    const host = mobilePanelLayout.matches ? modal : modal?.querySelector('.ai-image-modal__card');
+    if (close && host && close.parentElement !== host) host.prepend(close);
   }
+  const mobilePanelLayout = matchMedia('(max-width: 860px)');
   mobilePanelLayout.addEventListener('change', prepareMobilePanelCloseButtons);
 
   preparePanelTypography();
