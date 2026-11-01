@@ -235,6 +235,7 @@
   function initializeBreadcrumbLayout() {
     const rows = [...document.querySelectorAll('.info-panel .tree')];
     const originals = new WeakMap();
+    const wordGroups = new WeakMap();
     let cache = new WeakMap();
     let pending = false;
     const number = value => parseFloat(value) || 0;
@@ -242,17 +243,50 @@
       const range = document.createRange();
       range.selectNodeContents(element);
       const lines = [];
-      for (const rect of range.getClientRects()) {
-        if (rect.width <= 0 || rect.height <= 0) continue;
-        let line = lines.find(value => Math.abs(value.top - rect.top) < 1);
-        if (!line) lines.push(line = { top: rect.top, left: rect.left, right: rect.right });
-        else { line.left = Math.min(line.left, rect.left); line.right = Math.max(line.right, rect.right); }
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        range.selectNodeContents(walker.currentNode);
+        for (const rect of range.getClientRects()) {
+          if (rect.width <= 0 || rect.height <= 0) continue;
+          let line = lines.find(value => Math.abs(value.top - rect.top) < 1);
+          if (!line) lines.push(line = { top: rect.top, left: rect.left, right: rect.right });
+          else { line.left = Math.min(line.left, rect.left); line.right = Math.max(line.right, rect.right); }
+        }
       }
       return { lines: lines.length, width: Math.max(0, ...lines.map(line => line.right - line.left)) };
     };
+    function ensureWords(label) {
+      const old = wordGroups.get(label);
+      const text = label.textContent;
+      if (old?.text === text && old.wrapper.parentElement === label) return old;
+      const wrapper = document.createElement('span');
+      wrapper.style.cssText = 'display:block;min-width:0;max-width:100%;flex:1 1 auto';
+      const words = [];
+      for (const token of text.match(/\s+|\S+/gu) || []) {
+        if (/^\s+$/u.test(token)) wrapper.appendChild(document.createTextNode(token));
+        else {
+          const element = document.createElement('span');
+          element.textContent = token;
+          element.style.whiteSpace = 'nowrap';
+          wrapper.appendChild(element);
+          words.push({ element, width: 0 });
+        }
+      }
+      label.replaceChildren(wrapper);
+      const group = { text, wrapper, words };
+      wordGroups.set(label, group);
+      return group;
+    }
+    function setWordWrapping(label, width) {
+      for (const word of wordGroups.get(label)?.words || []) {
+        // An intact word moves to the next line first. Hyphenation is allowed only if it cannot fit by itself.
+        word.element.style.whiteSpace = word.width <= width + 1 / 64 ? 'nowrap' : 'normal';
+      }
+    }
     const pin = (element, width) => {
       element.style.width = `${Math.max(0, width)}px`;
       element.style.flex = '0 0 auto';
+      setWordWrapping(element, width);
     };
     function layout(row) {
       const visible = [...row.children].filter(element => getComputedStyle(element).display !== 'none');
@@ -266,8 +300,13 @@
         return [element.textContent, textStyle.font, textStyle.letterSpacing].join('|');
       }).join('\n');
       const previous = cache.get(row);
-      if (previous?.width === width && previous.signature === signature) return;
+      if (previous?.width === width && previous.signature === signature && labels.every(label => {
+        const group = wordGroups.get(label);
+        return group?.text === label.textContent && group.wrapper.parentElement === label;
+      })) return;
       for (const label of labels) {
+        const group = ensureWords(label);
+        group.words.forEach(word => { word.element.style.whiteSpace = 'nowrap'; });
         if (!originals.has(label)) originals.set(label, {
           width: label.style.width, flex: label.style.flex, whiteSpace: label.style.whiteSpace
         });
@@ -277,7 +316,12 @@
         label.style.whiteSpace = 'nowrap';
       }
       const natural = labels.map(label => textMetrics(label).width + 1 / 16);
+      for (const label of labels) {
+        for (const word of wordGroups.get(label).words) word.width = textMetrics(word.element).width;
+      }
       for (const label of labels) label.style.whiteSpace = originals.get(label).whiteSpace;
+      const initialWidths = labels.map(label => label.getBoundingClientRect().width);
+      labels.forEach((label, index) => setWordWrapping(label, initialWidths[index]));
       const separators = visible.filter(element => element.classList.contains('line'))
         .reduce((sum, element) => sum + element.getBoundingClientRect().width, 0);
       const available = Math.max(0, width - separators - number(style.columnGap) * (visible.length - 1));
@@ -294,14 +338,17 @@
           if (!measurements.has(key)) {
             pin(labels[index], value);
             const metric = textMetrics(labels[index]);
-            measurements.set(key, { ...metric, overflow: metric.width > value + .5 ? 1 : 0 });
+            const splits = wordGroups.get(labels[index]).words.filter(word => word.width > value + 1 / 64).length;
+            measurements.set(key, { ...metric, splits, overflow: metric.width > value + .5 ? 1 : 0 });
           }
           return measurements.get(key);
         }
         function score(values) {
           const metrics = values.map((value, index) => measure(index, value));
           return [metrics.reduce((sum, value) => sum + value.overflow, 0),
-            Math.max(...metrics.map(value => value.lines)), metrics.reduce((sum, value) => sum + value.lines, 0)];
+            Math.max(...metrics.map(value => value.lines)),
+            metrics.reduce((sum, value) => sum + value.splits, 0),
+            metrics.reduce((sum, value) => sum + value.lines, 0)];
         }
         const better = (a, b) => a.some((value, index) => value < b[index] && a.slice(0, index).every((n, i) => n === b[i]));
         let bestScore = score(widths);
@@ -350,6 +397,67 @@
     window.addEventListener('resize', schedule, { passive: true });
     document.fonts?.ready.then(() => { cache = new WeakMap(); schedule(); });
     document.fonts?.addEventListener('loadingdone', () => { cache = new WeakMap(); schedule(); });
+    schedule();
+  }
+
+  // Keep complete words together in wrapping titles; split only words wider than the title.
+  // Map hover tooltips deliberately retain their single-line layout.
+  function initializeTitleWordWrapping() {
+    const selector = '.globe-panel-title, .card-name-de, #globe-search .globe-search-title';
+    let groups = new WeakMap();
+    let pending = false;
+    const observed = new WeakSet();
+    const schedule = () => {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        document.querySelectorAll(selector).forEach(layout);
+      });
+    };
+    const resize = new ResizeObserver(schedule);
+    function layout(title) {
+      // Breadcrumbs have their own allocator and word groups.
+      if (title.closest('.tree')) return;
+      if (!observed.has(title)) { resize.observe(title); observed.add(title); }
+      const style = getComputedStyle(title);
+      const width = title.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+      if (width <= 0 || style.whiteSpace === 'nowrap') return;
+      const text = title.textContent;
+      const signature = [width, text, style.font, style.letterSpacing].join('|');
+      const old = groups.get(title);
+      if (old?.signature === signature && old.wrapper.parentElement === title) return;
+      const wrapper = document.createElement('span');
+      wrapper.className = 'globe-title-words';
+      const words = [];
+      for (const token of text.match(/\s+|\S+/gu) || []) {
+        if (/^\s+$/u.test(token)) wrapper.appendChild(document.createTextNode(token));
+        else {
+          const word = document.createElement('span');
+          word.textContent = breadcrumbLabel(germanDisplayName(token));
+          word.style.whiteSpace = 'nowrap';
+          wrapper.appendChild(word);
+          words.push(word);
+        }
+      }
+      title.replaceChildren(wrapper);
+      const widths = words.map(word => word.getBoundingClientRect().width);
+      words.forEach((word, index) => {
+        if (widths[index] > width + 1 / 64) word.style.whiteSpace = 'normal';
+      });
+      groups.set(title, { signature: [width, title.textContent, style.font, style.letterSpacing].join('|'), wrapper });
+    }
+    const changes = new MutationObserver(records => {
+      if (records.some(record => {
+        const host = record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement;
+        return host?.closest(selector) || [...record.addedNodes].some(node =>
+          node.nodeType === Node.ELEMENT_NODE && (node.matches(selector) || node.querySelector(selector)));
+      })) schedule();
+    });
+    changes.observe(document.body, { childList: true, characterData: true, subtree: true });
+    const refreshFonts = () => { groups = new WeakMap(); schedule(); };
+    document.fonts?.ready.then(refreshFonts);
+    document.fonts?.addEventListener('loadingdone', refreshFonts);
     schedule();
   }
 
@@ -405,6 +513,7 @@
   prepareMobilePanelCloseButtons();
   preparePanelLayout();
   initializeBreadcrumbLayout();
+  initializeTitleWordWrapping();
 
 
   // =========================================================
@@ -2480,6 +2589,7 @@
       false
     );
 
+    DOM.genusPanel?.classList.toggle("globe-no-extinction-date", !genusDate);
     if (DOM.genusExCard) {
       DOM.genusExCard.style.display = genusDate ? "" : "none";
     }
