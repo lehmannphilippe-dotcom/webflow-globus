@@ -202,12 +202,39 @@
     return String(value || '').replace(/Akepakleidervogel/g, 'Akepa\u00adkleider\u00advogel');
   }
 
+  // Optional break points for the displayed labels, never for taxonomy keys or search data.
+  // German prose uses the browser dictionary; scientific names use curated segments.
+  const breadcrumbBreaks = Object.fromEntries([
+    'Kleider-vögel', 'Accipi-tri-dae', 'Acro-cepha-li-dae', 'Acro-cephalus',
+    'Aide-media', 'Anse-rinae', 'Apteri-bis', 'Buteo-ninae',
+    'Chaeto-ptila', 'Chely-chely-nechen', 'Chlori-dops', 'Drepa-ni-dini',
+    'Dys-moro-drepanis', 'Gralli-strix', 'Hali-aeetus', 'Hemi-gnathus',
+    'Hima-tione', 'Loxio-ides', 'Melam-prosops', 'Mya-destes',
+    'Orthio-spiza', 'Paroreo-myza', 'Psitti-rostra', 'Ptaio-chen',
+    'Rhoda-canthis', 'Stri-gidae', 'Tele-spiza', 'Thambeto-chen',
+    'Thambeto-che-nini', 'Threskior-ni-thi-dae', 'Vangu-lifer', 'Viri-donia',
+    'Xesto-spiza', 'angusti-pluma', 'brac-catus', 'chaulio-dous',
+    'elli-sianus', 'fami-liaris', 'fasti-gialis', 'flavi-ceps',
+    'hylo-badistes', 'implu-viatus', 'keple-rorum', 'lanai-ensis',
+    'mya-destinus', 'neo-phasis', 'ochra-ceus', 'perse-cutrix',
+    'phaeo-soma', 'psitta-cea', 'ral-phorum', 'regis-kongi',
+    'sagitti-rostris', 'sandwi-chensis', 'stej-negeri', 'upupi-rostris',
+    'woah-ensis', 'wolsten-holmei'
+  ].map(parts => [parts.replaceAll('-', ''), parts.replaceAll('-', '\u00ad')]));
+
+  function breadcrumbLabel(value) {
+    return String(value || '').replace(/[A-Za-zÄÖÜäöüß]+/g, word => breadcrumbBreaks[word] || word);
+  }
+
   // Keep the two logical parts of the family label separate; Webflow controls layout.
   function familyBreadcrumbLabel(value) {
-    return String(value || '').trim().replace(/\s+(\([^()]+\))$/, '\n$1');
+    return breadcrumbLabel(String(value || '').trim().replace(/\s+(\([^()]+\))$/, '\n$1'));
   }
 
   function preparePanelTypography() {
+    for (const element of [DOM.panelFamilyLink, DOM.genusFamily]) element?.setAttribute('lang', 'de');
+    for (const element of [DOM.panelGenusLink, DOM.panelNameLat]) element?.setAttribute('lang', 'la');
+
     for (const element of [DOM.panelNameDe, DOM.genusNameDe, DOM.genusNameLat, DOM.familyNameDe, DOM.familyNameLat]) {
       element?.classList.add('globe-panel-title');
       element?.setAttribute('lang', 'de');
@@ -2257,9 +2284,9 @@
      setPanelImageForItem(item);
 
     U.setText(DOM.panelFamilyLink, familyBreadcrumbLabel(item.taxonomy.family));
-    U.setText(DOM.panelGenusLink, item.taxonomy.genus);
+    U.setText(DOM.panelGenusLink, breadcrumbLabel(item.taxonomy.genus));
     U.setText(DOM.panelNameDe, germanDisplayName(item.name.de));
-    U.setText(DOM.panelNameLat, item.name.lat);
+    U.setText(DOM.panelNameLat, breadcrumbLabel(item.name.lat));
     U.setText(DOM.panelExtDate, item.extinction_date || item.last_seen || "");
 
     U.setHTML(DOM.panelDesc, item.panel.description);
