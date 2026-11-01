@@ -202,6 +202,11 @@
     return String(value || '').replace(/Akepakleidervogel/g, 'Akepa\u00adkleider\u00advogel');
   }
 
+  // Keep the two logical parts of the family label separate; Webflow controls layout.
+  function familyBreadcrumbLabel(value) {
+    return String(value || '').trim().replace(/\s+(\([^()]+\))$/, '\n$1');
+  }
+
   function preparePanelTypography() {
     for (const element of [DOM.panelNameDe, DOM.genusNameDe, DOM.genusNameLat, DOM.familyNameDe, DOM.familyNameLat]) {
       element?.classList.add('globe-panel-title');
@@ -217,21 +222,9 @@
     }
   }
 
-  function prepareSpeciesBreadcrumb() {
-    const fields = [DOM.panelFamilyLink, DOM.panelGenusLink, DOM.panelNameLat].filter(Boolean);
-    if (fields.length < 2) return;
-    let row = fields[0].parentElement;
-    while (row && !fields.every(field => row.contains(field))) row = row.parentElement;
-    // Never rebuild a broader content container that also holds the panel title or image.
-    if (!row || row === DOM.panelEl || row.contains(DOM.panelNameDe) || row.contains(DOM.panelImg)) return;
-    row.classList.add('globe-breadcrumb');
-    fields.forEach(field => field.classList.add('globe-breadcrumb-item'));
-    row.replaceChildren(...fields); // Keep the original links and their event listeners.
-  }
-
   // Webflow owns the panel structure. Only direct text sections receive mobile insets.
   function preparePanelLayout() {
-    const sections = '.tree, .heading-6, .heading-7, .extinction, .paragraph-4, ' +
+    const sections = '.heading-6, .heading-7, .extinction, .paragraph-4, ' +
       '.last-paragraph, .references-accordion, #genus-count, #family-count';
     for (const panel of [DOM.panelEl, DOM.genusPanel, DOM.familyPanel]) {
       const scroller = panel?.querySelector('.panel-content');
@@ -260,7 +253,6 @@
   mobilePanelLayout.addEventListener('change', prepareMobilePanelCloseButtons);
 
   preparePanelTypography();
-  prepareSpeciesBreadcrumb();
   prepareMobilePanelCloseButtons();
   preparePanelLayout();
 
@@ -2264,7 +2256,7 @@
 
      setPanelImageForItem(item);
 
-    U.setText(DOM.panelFamilyLink, item.taxonomy.family);
+    U.setText(DOM.panelFamilyLink, familyBreadcrumbLabel(item.taxonomy.family));
     U.setText(DOM.panelGenusLink, item.taxonomy.genus);
     U.setText(DOM.panelNameDe, germanDisplayName(item.name.de));
     U.setText(DOM.panelNameLat, item.name.lat);
@@ -2322,7 +2314,7 @@
     const speciesCount = speciesList.length;
     const genusDate = genusItem?.extinction_date || "";
 
-    U.setText(DOM.genusFamily, genusItem?.family || "");
+    U.setText(DOM.genusFamily, familyBreadcrumbLabel(genusItem?.family));
     if (DOM.genusFamily) DOM.genusFamily.dataset.familyKey = genusItem?.family_key || "";
     U.setText(DOM.genusNameLat, genusItem?.name?.lat || "");
     U.setText(DOM.genusNameDe, genusItem?.name?.de || "");
