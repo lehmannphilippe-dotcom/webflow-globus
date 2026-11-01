@@ -3875,12 +3875,13 @@ function renderFamilyCards(speciesList = []) {
     if (!source) return [];
     // Preserve the source's rendered Webflow styles before IDs are removed.
     // This also supports rules scoped to #species-tooltip / #tooltip-card.
+    // Family and weight stay on the original Webflow classes instead of being frozen inline.
     const properties = [
       'display', 'flex-direction', 'flex-wrap', 'align-items', 'align-content',
       'justify-content', 'gap', 'row-gap', 'column-gap', 'padding', 'margin',
       'background-color', 'background-image', 'background-size',
       'background-position', 'background-repeat', 'border', 'border-radius',
-      'box-shadow', 'color', 'font-family', 'font-size', 'font-weight',
+      'box-shadow', 'color', 'font-size',
       'font-style', 'line-height', 'letter-spacing', 'text-align',
       'text-transform', 'text-decoration', 'object-fit', 'object-position'
     ];
