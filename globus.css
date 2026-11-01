@@ -467,12 +467,20 @@ body.panel-open #globe {
 #species-panel #ai-image-info-button,
 #ai-image-info-button {
 
+  --ai-icon-edge: 12px;
+  --ai-control-size: 28px;
+  --ai-icon-size: 24px;
+  position: absolute !important;
+  top: auto !important; left: auto !important;
+  right: calc(var(--ai-icon-edge) - (var(--ai-control-size) - var(--ai-icon-size)) / 2) !important;
+  bottom: calc(var(--ai-icon-edge) - (var(--ai-control-size) - var(--ai-icon-size)) / 2) !important;
+  z-index: 12 !important;
   display: none !important;
   align-items: center !important;
   justify-content: center !important;
 
-  width: 28px !important;
-  height: 28px !important;
+  width: var(--ai-control-size) !important;
+  height: var(--ai-control-size) !important;
   min-width: 0 !important;
   min-height: 0 !important;
 
@@ -558,8 +566,8 @@ body.panel-open #globe {
   z-index: 2 !important;
   display: block !important;
 
-  width: 24px !important;
-  height: 24px !important;
+  width: var(--ai-icon-size) !important;
+  height: var(--ai-icon-size) !important;
   flex: 0 0 auto !important;
 
   transform: translate(-50%, -50%) !important;
@@ -1927,10 +1935,6 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
     background: linear-gradient(to bottom, rgba(4,5,42,.78), rgba(4,5,42,0));
     pointer-events: none; z-index: 2;
   }
-  #species-panel .panel-image-wrap #ai-image-info-button {
-    left: auto !important; top: auto !important; right: 16px !important; bottom: 16px !important;
-    width: 28px !important; height: 28px !important; transform: none !important;
-  }
   body.panel-open #globe { transform: translate3d(0, 0, 0) !important; opacity: 0 !important; pointer-events: none !important; }
   body.panel-open canvas { pointer-events: none !important; }
   :is(#species-panel, #family-panel, #genus-panel, #ai-image-modal) > .globe-mobile-close {
@@ -1952,4 +1956,9 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
   .globe-mobile-close::after { display: none !important; }
   .ai-image-modal { height: 100dvh; }
   .ai-image-modal__card { box-sizing: border-box; width: 100%; height: 100dvh; max-height: 100dvh; }
+}
+
+/* Bridge the application’s mobile breakpoint (860px) and Webflow’s (767px). */
+@media (min-width: 768px) and (max-width: 860px) {
+  #species-panel .globe-breadcrumb { margin-top: 24px; }
 }
