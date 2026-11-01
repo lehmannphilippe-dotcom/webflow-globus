@@ -691,29 +691,7 @@
 
     DOM.aiImageInfoButton = btn || null;
 
-    if (btn && btn.dataset.aiBaseStyleApplied !== "true") {
-      btn.dataset.aiBaseStyleApplied = "true";
-      btn.style.position = "absolute";
-      btn.style.right = "18px";
-      btn.style.bottom = "18px";
-      btn.style.zIndex = "12";
-      btn.style.width = "28px";
-      btn.style.height = "28px";
-      btn.style.minWidth = "0";
-      btn.style.minHeight = "0";
-      btn.style.padding = "0";
-      btn.style.margin = "0";
-      btn.style.background = "transparent";
-      btn.style.backgroundColor = "transparent";
-      btn.style.border = "0";
-      btn.style.boxShadow = "none";
-      btn.style.fontSize = "0";
-      btn.style.lineHeight = "0";
-      btn.style.display = "none";
-      btn.style.alignItems = "center";
-      btn.style.justifyContent = "center";
-      btn.style.overflow = "visible";
-    }
+    // Geometry and appearance have a single owner: globus.css.
 
     if (btn && btn.dataset.aiSvgInjected !== "true") {
       btn.dataset.aiSvgInjected = "true";
