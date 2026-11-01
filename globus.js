@@ -226,9 +226,131 @@
     return String(value || '').replace(/[A-Za-zÄÖÜäöüß]+/g, word => breadcrumbBreaks[word] || word);
   }
 
-  // Keep the two logical parts of the family label separate; Webflow controls layout.
+  // The label has no forced line break; fit is decided from the available row width.
   function familyBreadcrumbLabel(value) {
-    return breadcrumbLabel(String(value || '').trim().replace(/\s+(\([^()]+\))$/, '\n$1'));
+    return breadcrumbLabel(String(value || '').trim());
+  }
+
+  // Webflow owns typography, separators and gaps. Only content-dependent widths are measured here.
+  function initializeBreadcrumbLayout() {
+    const rows = [...document.querySelectorAll('.info-panel .tree')];
+    const originals = new WeakMap();
+    let cache = new WeakMap();
+    let pending = false;
+    const number = value => parseFloat(value) || 0;
+    const textMetrics = element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const lines = [];
+      for (const rect of range.getClientRects()) {
+        if (rect.width <= 0 || rect.height <= 0) continue;
+        let line = lines.find(value => Math.abs(value.top - rect.top) < 1);
+        if (!line) lines.push(line = { top: rect.top, left: rect.left, right: rect.right });
+        else { line.left = Math.min(line.left, rect.left); line.right = Math.max(line.right, rect.right); }
+      }
+      return { lines: lines.length, width: Math.max(0, ...lines.map(line => line.right - line.left)) };
+    };
+    const pin = (element, width) => {
+      element.style.width = `${Math.max(0, width)}px`;
+      element.style.flex = '0 0 auto';
+    };
+    function layout(row) {
+      const visible = [...row.children].filter(element => getComputedStyle(element).display !== 'none');
+      const labels = visible.filter(element => !element.classList.contains('line'));
+      if (labels.length < 2) return;
+      const style = getComputedStyle(row);
+      const width = row.clientWidth - number(style.paddingLeft) - number(style.paddingRight);
+      if (width <= 0) return;
+      const signature = labels.map(element => {
+        const textStyle = getComputedStyle(element);
+        return [element.textContent, textStyle.font, textStyle.letterSpacing].join('|');
+      }).join('\n');
+      const previous = cache.get(row);
+      if (previous?.width === width && previous.signature === signature) return;
+      for (const label of labels) {
+        if (!originals.has(label)) originals.set(label, {
+          width: label.style.width, flex: label.style.flex, whiteSpace: label.style.whiteSpace
+        });
+        const original = originals.get(label);
+        label.style.width = original.width;
+        label.style.flex = original.flex;
+        label.style.whiteSpace = 'nowrap';
+      }
+      const natural = labels.map(label => textMetrics(label).width + 1 / 16);
+      for (const label of labels) label.style.whiteSpace = originals.get(label).whiteSpace;
+      const separators = visible.filter(element => element.classList.contains('line'))
+        .reduce((sum, element) => sum + element.getBoundingClientRect().width, 0);
+      const available = Math.max(0, width - separators - number(style.columnGap) * (visible.length - 1));
+      if (natural.reduce((sum, value) => sum + value, 0) <= available) {
+        labels.forEach((label, index) => pin(label, natural[index]));
+      } else {
+        // Start with native wrapping, then balance line counts before tightening the columns.
+        let widths = labels.map(label => Math.min(label.getBoundingClientRect().width,
+          textMetrics(label).width + 1 / 16));
+        widths[widths.length - 1] = Math.max(0, available - widths.slice(0, -1).reduce((a, b) => a + b, 0));
+        const measurements = new Map();
+        function measure(index, value) {
+          const key = `${index}:${value.toFixed(2)}`;
+          if (!measurements.has(key)) {
+            pin(labels[index], value);
+            const metric = textMetrics(labels[index]);
+            measurements.set(key, { ...metric, overflow: metric.width > value + .5 ? 1 : 0 });
+          }
+          return measurements.get(key);
+        }
+        function score(values) {
+          const metrics = values.map((value, index) => measure(index, value));
+          return [metrics.reduce((sum, value) => sum + value.overflow, 0),
+            Math.max(...metrics.map(value => value.lines)), metrics.reduce((sum, value) => sum + value.lines, 0)];
+        }
+        const better = (a, b) => a.some((value, index) => value < b[index] && a.slice(0, index).every((n, i) => n === b[i]));
+        let bestScore = score(widths);
+        for (let pass = 0; pass < 3; pass++) {
+          let best = widths;
+          for (let from = 0; from < labels.length; from++) {
+            for (let to = 0; to < labels.length; to++) {
+              if (from === to) continue;
+              const limit = Math.min(widths[from] - 8, natural[to] - widths[to]);
+              const steps = new Set([limit]);
+              for (let amount = 8; amount < limit; amount += 8) steps.add(amount);
+              for (const amount of steps) {
+                if (amount <= 0) continue;
+                const candidate = widths.slice();
+                candidate[from] -= amount; candidate[to] += amount;
+                const candidateScore = score(candidate);
+                if (better(candidateScore, bestScore)) { best = candidate; bestScore = candidateScore; }
+              }
+            }
+          }
+          if (best === widths) break;
+          widths = best;
+        }
+        // Join text and hyphen rectangles on each line, so a visible hyphen is included in its width.
+        let used = 0;
+        labels.slice(0, -1).forEach((label, index) => {
+          const tight = Math.min(widths[index], measure(index, widths[index]).width + 1 / 16);
+          pin(label, tight); used += tight;
+        });
+        const last = labels.length - 1;
+        pin(labels[last], Math.min(natural[last], Math.max(0, available - used)));
+      }
+      cache.set(row, { width, signature });
+    }
+    function schedule() {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => { pending = false; rows.forEach(layout); });
+    }
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null;
+    const changes = new MutationObserver(schedule);
+    for (const row of rows) {
+      resize?.observe(row);
+      changes.observe(row, { childList: true, characterData: true, subtree: true });
+    }
+    window.addEventListener('resize', schedule, { passive: true });
+    document.fonts?.ready.then(() => { cache = new WeakMap(); schedule(); });
+    document.fonts?.addEventListener('loadingdone', () => { cache = new WeakMap(); schedule(); });
+    schedule();
   }
 
   function preparePanelTypography() {
@@ -282,6 +404,7 @@
   preparePanelTypography();
   prepareMobilePanelCloseButtons();
   preparePanelLayout();
+  initializeBreadcrumbLayout();
 
 
   // =========================================================
