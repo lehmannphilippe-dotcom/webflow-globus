@@ -117,12 +117,6 @@ body.panel-open #globe {
    TEXT IM SPECIES-PANEL
 --------------------------- */
 
-#panel-description,
-#panel-habitat,
-#panel-extinction {
-  line-height: 1.55;
-}
-
 #panel-description p,
 #panel-habitat p,
 #panel-extinction p {
@@ -201,10 +195,10 @@ body.panel-open #globe {
 
 .family-genus-label {
   font-family: "Rubik Variablefont Wght", sans-serif;
-  font-size: 17px;
-  font-weight: 300;
+  font-size: 18px;
+  font-weight: 400;
   font-style: normal;
-  line-height: 1.2;
+  line-height: 24px;
   color: #ffffff;
   white-space: nowrap;
   margin-bottom: 8px;
@@ -305,10 +299,10 @@ body.panel-open #globe {
   box-shadow: none !important;
 
   font-family: "Rubik Variablefont Wght", sans-serif !important;
-  font-size: 17px !important;
-  font-weight: 300 !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
   font-style: normal !important;
-  line-height: 1.2 !important;
+  line-height: 24px !important;
   color: #ffffff !important;
   white-space: nowrap !important;
   text-align: left !important;
@@ -693,16 +687,16 @@ body.panel-open #globe {
 .ai-image-modal__card h2 {
   margin: 0 0 16px 0;
   font-size: 34px;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.1;
 }
 
 .ai-image-modal__card p {
   margin: 0;
   color: #97b4e4;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 300;
-  line-height: 1.45;
+  line-height: 25px;
 }
 
 .ai-image-modal__legend {
@@ -756,14 +750,14 @@ body.panel-open #globe {
 
 .ai-image-modal__legend-item h3 {
   margin: 0 0 6px 0;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 1.2;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 25px;
 }
 
 .ai-image-modal__legend-item p {
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 22px;
 }
 
 body.ai-modal-open {
@@ -948,7 +942,7 @@ body::-webkit-scrollbar,
   color: #121641;
   font-family: "Rubik Variablefont Wght", sans-serif;
 }
-#globe-search .gs-count strong { font-size: 40px; font-weight: inherit; line-height: 40px; }
+#globe-search .gs-count strong { font-size: 40px; font-weight: 500; line-height: 40px; }
 #globe-search .gs-count span { font-size: 14px; line-height: 16px; }
 
 /* Preserve the original horizontal tooltip composition at full list width. */
@@ -1283,8 +1277,7 @@ body.panel-open #globe-view-switch { display: none; }
   justify-content: center;
   width: 100%;
   min-height: 58px;
-  font: 800 81.544px/1 "Rubik Variablefont Wght", sans-serif;
-  font-size: 72.483px;
+  font: 400 72px/1 "Rubik Variablefont Wght", sans-serif;
   font-variant-numeric: tabular-nums;
   color: #7493c6;
 }
@@ -1296,7 +1289,7 @@ body.panel-open #globe-view-switch { display: none; }
 #globe-intro .gi-regions {
   margin: 0;
   color: #ff5100;
-  font: 500 16px/24px "Rubik Variablefont Wght", sans-serif;
+  font: 400 16px/24px "Rubik Variablefont Wght", sans-serif;
 }
 #globe-intro .gi-hawaii {
   display: flex;
@@ -1375,9 +1368,9 @@ body.panel-open #globe { transform: none; }
   pointer-events: auto;
 }
 #range-hover-popup[hidden] { display: none; }
-#range-hover-popup .rh-title { margin: 0; color: var(--rh-color); font: 500 16px/22px "Rubik Variablefont Wght", sans-serif; }
+#range-hover-popup .rh-title { margin: 0; color: var(--rh-color); font: 400 16px/22px "Rubik Variablefont Wght", sans-serif; }
 #range-hover-popup .rh-title:not([hidden]) + .rh-text:not([hidden]) { margin-top: 4px; }
-#range-hover-popup .rh-text { margin: 0; color: #7da1da; font: 400 14px/22px "Rubik Variablefont Wght", sans-serif; white-space: pre-line; }
+#range-hover-popup .rh-text { margin: 0; color: #7da1da; font: 300 14px/22px "Rubik Variablefont Wght", sans-serif; white-space: pre-line; }
 @media (max-width: 860px) { #range-hover-popup { display: none; } }
 /* Let Cesium receive pointer movement through the otherwise blocking backdrop. */
 @media (min-width: 861px) {
@@ -1488,7 +1481,6 @@ body.panel-open #globe { transform: none; }
 .globe-species-card .card-name-lat,
 .globe-species-card .card-habitat {
   margin: 0 !important; height: auto !important;
-  font: 500 14px/normal "Rubik Variablefont Wght", sans-serif !important;
   color: #7493c6 !important;
 }
 .globe-species-card .card-habitat {
@@ -1512,7 +1504,6 @@ body.panel-open #globe { transform: none; }
   margin: 0 !important; padding: 0 !important; height: auto !important;
   width: auto !important; min-width: 0 !important;
   color: #ff5100 !important;
-  font: 500 14px/normal "Rubik Variablefont Wght", sans-serif !important;
 }
 .globe-extinction-cross {
   display: block !important; flex: 0 0 10px !important;
@@ -1663,7 +1654,7 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
 #species-browser .gbv-content { margin-top: -40px; opacity: 1; transform: none; transition: opacity 125ms ease-out, transform 125ms ease-out; }
 #species-browser .gbv-content.is-changing { opacity: 0; transform: translateY(6px); }
 #species-browser .gbv-group { margin: 0 0 13px; scroll-margin-top: 78px; }
-#species-browser .gbv-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 0 0 13px; color: #fff; font: 800 32px/30px "Rubik Variablefont Wght", sans-serif; overflow-wrap: anywhere; }
+#species-browser .gbv-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; margin: 0 0 13px; color: #fff; font: 400 32px/30px "Rubik Variablefont Wght", sans-serif; overflow-wrap: anywhere; }
 /* Native sticky stays bounded by its section and is pushed out by the next group. */
 #species-browser .gbv-heading {
   position: sticky;
@@ -1675,7 +1666,7 @@ body.panel-open #species-browser { pointer-events: none; overflow-y: hidden; }
   box-sizing: border-box;
   background: #04052a;
 }
-#species-browser .gbv-count { color: #7da1da; font: 400 18px/24px "Rubik Variablefont Wght", sans-serif; }
+#species-browser .gbv-count { color: #7da1da; font: 400 16px/24px "Rubik Variablefont Wght", sans-serif; }
 #species-browser .gbv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 8px; align-items: stretch; }
 #species-browser .gbv-card { display: flex !important; flex-direction: column !important; position: relative; width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; margin: 0 !important; align-self: stretch !important; box-sizing: border-box !important; flex: none !important; cursor: pointer; }
 /* Observe unscaled card boxes; transforms never change the uniform grid layout. */
@@ -1711,7 +1702,7 @@ body.globe-cards-view #species-browser .gbv-card.is-revealed {
   #species-browser { --gbv-heading-top: calc(var(--gbv-toolbar-top) + 76px); }
   #species-browser .gbv-content { margin-top: 0; }
   #species-browser .gbv-heading { width: 100%; max-width: none; font-size: 32px; line-height: 30px; gap: 6px; }
-  #species-browser .gbv-count { font-size: 18px; line-height: 24px; }
+  #species-browser .gbv-count { font-size: 16px; line-height: 24px; }
   #species-browser .gbv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   #species-browser.has-alphabet { --gbv-inset-right: 44px; padding-right: 44px; }
   #species-browser .gbv-alphabet { width: 32px; }
