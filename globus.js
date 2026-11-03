@@ -1474,6 +1474,14 @@
     const container = DOM.familyCards;
     if (!container) return;
 
+    // Mobile uses compositor-managed CSS sticky; avoid scroll/transform feedback.
+    if (mobilePanelLayout.matches) {
+      for (const label of container.querySelectorAll(".family-genus-label")) {
+        if (label.style.transform) label.style.removeProperty("transform");
+      }
+      return;
+    }
+
     const containerRect = container.getBoundingClientRect();
     const stickyLeft = containerRect.left + 24;
     const groups = getFamilyGenusGroups();
@@ -1527,7 +1535,7 @@
     container.addEventListener(
       "scroll",
       () => {
-        if (stickyRAF) return;
+        if (mobilePanelLayout.matches || stickyRAF) return;
 
         stickyRAF = requestAnimationFrame(() => {
           stickyRAF = 0;
@@ -2700,8 +2708,14 @@
       const rowRect = row.getBoundingClientRect();
       const lastCardRect = cards[cards.length - 1].getBoundingClientRect();
 
-      /* Sticky endet beim Anfang der letzten Card */
+      /* Sticky ends at the start of the last card, on desktop and mobile. */
       trackWidth = Math.max(0, Math.round(lastCardRect.left - rowRect.left));
+
+      if (mobilePanelLayout.matches) {
+        const label = track.querySelector(".family-genus-label");
+        // CSS sticky is constrained by the label's right edge.
+        trackWidth = Math.min(rowWidth, trackWidth + (label?.offsetWidth || 0));
+      }
     }
 
     track.style.setProperty("--genus-label-track-width", `${trackWidth}px`);
