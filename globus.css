@@ -410,6 +410,20 @@ body.panel-open #globe {
   z-index: 5 !important;
 }
 
+/* Mobile family rail: start at the existing 24px spacer, then pin at 4px.
+   Native sticky stays synchronized with touch scrolling without JS transforms. */
+@media (max-width: 860px) {
+  #family-cards .family-genus-group.is-multi-genus .family-genus-label {
+    position: sticky !important;
+    left: 4px !important;
+    display: block;
+    width: max-content;
+    transform: none !important;
+    transition: none !important;
+    will-change: auto;
+  }
+}
+
 /* ---------------------------------
    PANEL IMAGE LOADING / BLUR PLACEHOLDER
 --------------------------------- */
