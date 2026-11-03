@@ -1483,7 +1483,7 @@
     }
 
     const containerRect = container.getBoundingClientRect();
-    const stickyLeft = containerRect.left + 24;
+    const stickyLeft = containerRect.left + 4;
     const groups = getFamilyGenusGroups();
 
     for (const group of groups) {
@@ -1505,7 +1505,7 @@
       /*
         Mehrere Cards:
         1. Vor dem Sticky-Punkt: Label bewegt sich normal mit der Gruppe.
-        2. Zwischen erster und letzter Card: Label bleibt bei 24px stehen.
+        2. Zwischen erster und letzter Card: Label bleibt bei 4px stehen.
         3. Sobald die letzte Card den Sticky-Punkt erreicht: Label bewegt sich mit der letzten Card raus.
       */
       let targetLeft = groupRect.left;
