@@ -169,7 +169,8 @@ body.panel-open #globe {
   scrollbar-width: none;
   -ms-overflow-style: none;
 
-  touch-action: pan-x;
+  /* Let the browser route horizontal swipes to the rail and vertical swipes to the panel. */
+  touch-action: auto;
 }
 
 #genus-cards::-webkit-scrollbar,
@@ -403,7 +404,7 @@ body.panel-open #globe {
   overflow: visible !important;
 }
 
-/* Label klebt bei exakt 24px */
+/* Base label position; desktop JS and mobile CSS pin it at 4px. */
 .family-genus-label-track .family-genus-label {
   position: relative !important;
   left: auto !important;
