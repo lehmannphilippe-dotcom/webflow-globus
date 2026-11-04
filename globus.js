@@ -3279,234 +3279,263 @@ function renderFamilyCards(speciesList = []) {
     viewSwitch.setAttribute('role', 'group');
     viewSwitch.setAttribute('aria-label', 'Ansicht');
     viewSwitch.innerHTML = `
-      <button type="button" class="gv-tab gv-grid" aria-label="Kartenübersicht" aria-pressed="false"><span aria-hidden="true"></span></button>
+      <button type="button" class="gv-tab gv-grid" aria-label="Zeitliste nach Aussterbejahr" aria-pressed="false"><span aria-hidden="true"></span></button>
       <button type="button" class="gv-tab gv-globe is-active" aria-label="Globus" aria-pressed="true"><span aria-hidden="true"></span></button>`;
     viewSwitch.addEventListener('click', (event) => event.stopPropagation());
     document.body.appendChild(viewSwitch);
   }
 
   // =========================================================
-  // SPECIES OVERVIEW — original Webflow cards, grouped locally.
+  // EXTINCTION TIMELINE — regions filter; chronological order only.
+  // Reuses the live Webflow tooltip subtree and existing species panels.
   // =========================================================
-  const overviewCollator = new Intl.Collator('de', { sensitivity: 'base', numeric: true, ignorePunctuation: true });
-  const overviewSorts = [
-    ['year', 'Aussterbejahr'], ['de', 'Name (DE)'], ['lat', 'Name (Lat)'], ['region', 'Region']
-  ];
-  const overviewNormalize = (value) => String(value || '').normalize('NFD')
-    .replace(/[\u0300-\u036fʻ’']/g, '').replace(/ß/g, 'ss').toLowerCase().trim();
-  const overviewName = (item, language = 'de') => item.name?.[language] || item.name?.de || item.name?.lat || item.id || 'Ohne Namen';
+  const timelineCollator = new Intl.Collator('de', { sensitivity: 'base', numeric: true });
+  const timelineRegions = [['hawaii', 'Hawaii'], ['all', 'Alle Regionen']];
+  const timelineNormalize = value => String(value || '').normalize('NFD')
+    .replace(/[\u0300-\u036fʻ’']/g, '').toLowerCase();
+  const timelineName = item => item.name?.de || item.name?.lat || item.id || 'Ohne Namen';
 
-  function overviewDateRange(item) {
-    const text = String(item.extinction_date || item.last_seen || '').trim();
-    if (/wiederentdeckt/i.test(text)) return { special: 'rediscovered', text };
-    if (!text || !/\d/.test(text)) return { special: 'unknown', text };
-    if (/oder\s+später/i.test(text)) return { special: 'uncertain', text };
-    const centuries = text.match(/(\d{1,2})\s*\.\s*(?:oder\s+(\d{1,2})\s*\.|\/\s*(\d{1,2})\s*\.)?\s*Jh(?:r)?(?:dt|d)?\.?/i);
-    if (centuries) {
-      const first = Number(centuries[1]);
-      const last = Number(centuries[2] || centuries[3] || centuries[1]);
-      return { from: (first - 1) * 100, to: last * 100 - 1, text };
-    }
-    const years = (text.match(/\d{3,4}/g) || []).map(Number);
-    if (!years.length) return { special: 'unknown', text };
-    const from = Math.min(...years);
-    const to = Math.max(...years) + (/\d{3,4}er[\s-]*Jahre/i.test(text) ? 9 : 0);
-    return { from, to, text };
+  function timelineYear(item) {
+    const date = String(item.extinction_date || item.last_seen || '').trim();
+    // Approximate dates, centuries, ranges and rediscovered species stay out.
+    return /^\d{3,4}$/.test(date) ? Number(date) : null;
   }
 
-  function overviewYearBucket(item) {
-    const range = overviewDateRange(item);
-    const specialLabels = { unknown: 'Ohne Datierung', uncertain: 'Zeitraum unklar', rediscovered: 'Wiederentdeckt' };
-    const special = (key) => ({ key, label: specialLabels[key], order: { uncertain: 9000, unknown: 9001, rediscovered: 9002 }[key], year: Infinity });
-    if (range.special) return special(range.special);
-    // Before 1400 is one group; exact 1400 starts the following century group.
-    const bucket = (year) => year < 1400 ? 0 : Math.floor(year / 100) * 100;
-    const start = bucket(range.from);
-    if (start !== bucket(range.to)) return special('uncertain');
-    return { key: String(start), label: start === 0 ? '1000–1400' : String(start), order: start, year: range.from };
+  function timelineIsHawaii(item) {
+    return /\bhawaii\b/.test(timelineNormalize(item.habitat));
   }
 
-  function overviewRegions(item) {
-    const habitat = overviewNormalize(item.habitat);
-    const islands = habitat.replace(/\([^)]*\)/g, '').split(/[,;/]|\s+und\s+/).map((part) => part.trim());
-    const labels = { hawaii: 'Hawaii (Big Island)', kauai: 'Kauai', lanai: 'Lanai', laysan: 'Laysan', maui: 'Maui', molokai: 'Molokai', oahu: 'Oahu', niihau: 'Niihau', kahoolawe: 'Kahoolawe' };
-    // A bare "Hawaii" describes the archipelago, not necessarily Big Island.
-    if (habitat === 'hawaii') return ['Hawaii (ohne Inselangabe)'];
-    const names = [...new Set(islands.map((name) => labels[name]).filter(Boolean))];
-    return names.length ? names : /\bhawaii\b/.test(habitat) ? ['Hawaii (ohne Inselangabe)'] : [];
-  }
-
-  function overviewGroups(items, mode) {
-    // Scope only the card overview; globe and global search keep the full data.
-    items = items.filter((item) => overviewRegions(item).length > 0);
+  function timelineGroups(items, region) {
+    const dated = items.filter(item => timelineYear(item) !== null &&
+      (region === 'all' || timelineIsHawaii(item))).sort((a, b) =>
+        timelineYear(a) - timelineYear(b) || timelineCollator.compare(timelineName(a), timelineName(b)));
     const groups = new Map();
-    const add = (key, label, order, item) => {
-      if (!groups.has(key)) groups.set(key, { key, label, order, items: [] });
-      if (item) groups.get(key).items.push(item);
-    };
-    if (mode === 'year') [0, 1400, 1500, 1600, 1700, 1800, 1900, 2000].forEach((year) => add(String(year), year ? String(year) : '1000–1400', year));
-    for (const item of items) {
-      if (mode === 'year') {
-        const bucket = overviewYearBucket(item);
-        add(bucket.key, bucket.label, bucket.order, item);
-      } else if (mode === 'region') {
-        overviewRegions(item).forEach((name) => add(name, name, name, item));
-      } else {
-        const initial = overviewNormalize(overviewName(item, mode)).replace(/^[^a-z]+/, '').charAt(0).toUpperCase();
-        const letter = /^[A-Z]$/.test(initial) ? initial : '#';
-        add(letter, letter, letter === '#' ? 'ZZZ' : letter, item);
-      }
+    for (const item of dated) {
+      const year = timelineYear(item);
+      const century = year < 1800 ? 0 : Math.floor(year / 100) * 100;
+      if (!groups.has(century)) groups.set(century, { key: century, label: century ? String(century) : '1000–1799', items: [], decades: new Map() });
+      const group = groups.get(century);
+      group.items.push(item);
+      const decade = century ? Math.floor(year / 10) * 10 : 0;
+      if (!group.decades.has(decade)) group.decades.set(decade, []);
+      group.decades.get(decade).push(item);
     }
-    const result = [...groups.values()].sort((a, b) => typeof a.order === 'number' ? a.order - b.order : overviewCollator.compare(a.order, b.order));
-    for (const group of result) group.items.sort((a, b) => {
-      const spDifference = Number(/\bsp\./i.test(a.name?.lat || '')) - Number(/\bsp\./i.test(b.name?.lat || ''));
-      if (spDifference) return spDifference;
-      if (mode === 'year') {
-        const difference = overviewYearBucket(a).year - overviewYearBucket(b).year;
-        if (Number.isFinite(difference) && difference !== 0) return difference;
+    // Retain the empty decades of each displayed century for orientation.
+    for (const group of groups.values()) if (group.key) {
+      for (let year = group.key; year < group.key + 100; year += 10) {
+        if (!group.decades.has(year)) group.decades.set(year, []);
       }
-      return overviewCollator.compare(overviewName(a, mode === 'lat' ? 'lat' : 'de'), overviewName(b, mode === 'lat' ? 'lat' : 'de'));
-    });
-    return result;
+      group.decades = new Map([...group.decades].sort((a, b) => a[0] - b[0]));
+    }
+    return [...groups.values()];
+  }
+
+  function timelineRowCount(height, markerSize, gap = 12) {
+    return Math.max(1, Math.floor((Math.max(0, height - 16) + gap) / (markerSize + gap)));
   }
 
   const overview = document.createElement('section');
   overview.id = 'species-browser';
-  overview.setAttribute('aria-label', 'Kartenübersicht der Arten aus Hawaii');
+  overview.setAttribute('aria-label', 'Zeitliste der ausgestorbenen Arten');
   overview.setAttribute('aria-hidden', 'true');
   overview.setAttribute('inert', '');
   overview.innerHTML = `
     <div class="gbv-toolbar">
       <span id="gbv-sort-caption" class="gbv-caption">Sortieren nach:</span>
       <div class="gbv-select">
-        <button type="button" id="gbv-sort" class="gbv-sort" aria-haspopup="listbox" aria-expanded="false" aria-controls="gbv-options" aria-labelledby="gbv-sort-caption gbv-sort-value"><span id="gbv-sort-value">Aussterbejahr</span><span class="gbv-chevron" aria-hidden="true"></span></button>
-        <div id="gbv-options" class="gbv-options" role="listbox" aria-label="Sortierung" inert>
-          ${overviewSorts.map(([value, label]) => `<button type="button" role="option" data-sort="${value}" aria-selected="${value === 'year'}" tabindex="-1">${label}</button>`).join('')}
-        </div>
+        <button type="button" id="gbv-sort" class="gbv-sort" aria-haspopup="listbox" aria-expanded="false" aria-controls="gbv-options" aria-labelledby="gbv-sort-caption gbv-sort-value"><span id="gbv-sort-value">Hawaii</span><span class="gbv-chevron" aria-hidden="true"></span></button>
       </div>
     </div>
-    <div class="gbv-content" aria-busy="false"></div>
-    <nav class="gbv-alphabet" aria-label="Alphabetische Schnellnavigation" hidden></nav>
+    <div class="gbv-timeline" tabindex="0" role="region" aria-label="Aussterbejahre, horizontal scrollbar"><div class="gbv-content"></div></div>
+    <div id="gbv-options" class="gbv-options" role="listbox" aria-label="Region" hidden>
+      ${timelineRegions.map(([value, label]) => `<button type="button" role="option" data-region="${value}" aria-selected="${value === 'hawaii'}" tabindex="-1">${label}</button>`).join('')}
+    </div>
     <p class="gbv-status" role="status" aria-live="polite">Arten werden geladen …</p>`;
   document.body.appendChild(overview);
   const overviewContent = overview.querySelector('.gbv-content');
   const overviewStatus = overview.querySelector('.gbv-status');
-  const overviewAlphabet = overview.querySelector('.gbv-alphabet');
+  const timelineScroller = overview.querySelector('.gbv-timeline');
   const overviewSortButton = overview.querySelector('.gbv-sort');
   const overviewOptions = overview.querySelector('.gbv-options');
-  // Keep the menu above cards without lifting the opaque header over group titles.
-  overview.appendChild(overviewOptions);
-  const overviewOptionButtons = [...overviewOptions.querySelectorAll('[data-sort]')];
-  let overviewSort = 'year';
-  let overviewDataReady = false;
-  let overviewRenderedSort = null;
-  let overviewRenderToken = 0;
-  let overviewSwitchToken = 0;
-  let overviewGroupsOnScreen = [];
-  let overviewReturnFocus = null;
-  let overviewScrollFrame = 0;
-  let overviewMenuOpen = false;
-  let overviewHeaderLastScroll = 0;
-  let overviewHeaderTravel = 0;
-  let overviewAlphabetActive = null;
-
-  function setOverviewHeaderHidden(hidden) {
-    hidden = hidden && innerWidth <= 860 && activeView === 'cards';
-    document.body.classList.toggle('globe-overview-header-hidden', hidden);
-    overview.querySelector('.gbv-toolbar').toggleAttribute('inert', hidden);
-  }
-
-  function updateOverviewScrollHeader() {
-    const top = Math.max(0, overview.scrollTop);
-    const delta = top - overviewHeaderLastScroll;
-    overviewHeaderLastScroll = top;
-    if (innerWidth > 860 || top < 32 || overviewMenuOpen ||
-        document.body.classList.contains('globe-search-open') || document.body.classList.contains('panel-open')) {
-      overviewHeaderTravel = 0;
-      setOverviewHeaderHidden(false);
-      return;
-    }
-    if (Math.sign(delta) !== Math.sign(overviewHeaderTravel)) overviewHeaderTravel = 0;
-    overviewHeaderTravel += delta;
-    if (overviewHeaderTravel > 12) setOverviewHeaderHidden(true);
-    else if (overviewHeaderTravel < -8) setOverviewHeaderHidden(false);
-  }
-
-  function positionOverviewAlphabet() {
-    if (overviewAlphabet.hidden) return;
-    const rect = overview.getBoundingClientRect();
-    const viewport = window.visualViewport;
-    const visibleTop = Math.max(rect.top, viewport?.offsetTop || 0);
-    const visibleBottom = Math.min(rect.bottom, (viewport?.offsetTop || 0) + (viewport?.height || innerHeight));
-    const heading = overviewContent.querySelector('.gbv-heading');
-    const top = visibleTop + overviewHeadingOffset() + (heading?.offsetHeight || 30) + 8;
-    const bottom = visibleBottom - Math.max(12, parseFloat(getComputedStyle(overview).paddingBottom) || 0);
-    overviewAlphabet.style.top = `${(top + bottom) / 2}px`;
-    overviewAlphabet.style.maxHeight = `${Math.max(56, bottom - top - 16)}px`;
-  }
-
-  let overviewImageObserver = null;
-  const overviewImageSources = new WeakMap();
+  const overviewOptionButtons = [...overviewOptions.querySelectorAll('[data-region]')];
   const overviewReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const overviewWait = (ms) => new Promise((resolve) => setTimeout(resolve, overviewReducedMotion() ? 0 : ms));
-  if ('IntersectionObserver' in window) {
-    overviewImageObserver = new IntersectionObserver((entries) => {
-      for (const entry of entries) if (entry.isIntersecting) {
-        const url = overviewImageSources.get(entry.target);
-        if (url) U.setWFImage(entry.target, url);
-        overviewImageSources.delete(entry.target);
-        overviewImageObserver.unobserve(entry.target);
-      }
-    }, { root: overview, rootMargin: '500px 0px' });
+  let overviewRegion = 'hawaii';
+  let overviewDataReady = false;
+  let overviewRenderedRegion = null;
+  let overviewSwitchToken = 0;
+  let overviewReturnFocus = null;
+  let overviewMenuOpen = false;
+  let timelineRows = 0;
+  let timelineLayoutFrame = 0;
+  let timelineHover = null;
+  let timelineHoverButton = null;
+  let timelineHoverAvatar = null;
+  let timelineHoverSurface = null;
+  let timelineHoverText = null;
+  let timelineHoverLatin = null;
+  let timelineHoverDate = null;
+  const timelineHoverMedia = matchMedia('(hover: hover) and (pointer: fine)');
+
+  function hideTimelineTooltip() {
+    timelineHoverButton?.classList.remove('is-hovered');
+    timelineHoverButton?.removeAttribute('aria-describedby');
+    timelineHoverButton = null;
+    if (timelineHover) timelineHover.hidden = true;
   }
 
-  // Codrops Hapi: scale from the centre + linear opacity, staggered per viewport batch.
-  let overviewRevealObserver = null;
-  let overviewRevealFrame = 0;
-  const overviewRevealQueue = new Set();
-
-  function stopOverviewCardReveal() {
-    overviewRevealObserver?.disconnect();
-    overviewRevealObserver = null;
-    cancelAnimationFrame(overviewRevealFrame);
-    overviewRevealFrame = 0;
-    overviewRevealQueue.clear();
-  }
-
-  function revealOverviewCards() {
-    overviewRevealFrame = 0;
-    if (activeView !== 'cards') { overviewRevealQueue.clear(); return; }
-    const cards = [...overviewContent.querySelectorAll('.gbv-card')]
-      .filter((card) => overviewRevealQueue.has(card));
-    overviewRevealQueue.clear();
-    cards.forEach((card, index) => {
-      card.style.setProperty('--gbv-reveal-delay', `${index * 50}ms`);
-      card.style.setProperty('--gbv-reveal-duration', `${600 + index * 75}ms`);
-      card.classList.remove('is-reveal-pending');
-      card.classList.add('is-revealed');
+  function ensureTimelineTooltip() {
+    if (timelineHover || !DOM.tip) return Boolean(timelineHover);
+    const styles = snapshotSearchTooltipStyles(DOM.tip);
+    timelineHover = DOM.tip.cloneNode(true);
+    timelineHoverAvatar = timelineHover.querySelector('[id="tooltip-avatar"]');
+    timelineHoverText = timelineHover.querySelector('[id="tooltip-name-de"]');
+    timelineHoverLatin = timelineHover.querySelector('[id="tooltip-name-lat"]');
+    timelineHoverDate = timelineHover.querySelector('[id="tooltip-lastseen"]');
+    timelineHoverSurface = timelineHover.querySelector('[id="tooltip-card"]') || timelineHover.firstElementChild;
+    [timelineHover, ...timelineHover.querySelectorAll('*')].forEach((element, index) => {
+      (styles[index] || []).forEach(([property, value]) => element.style.setProperty(property, value));
+      ['id', 'data-w-id', 'aria-labelledby', 'aria-describedby'].forEach(name => element.removeAttribute(name));
     });
+    timelineHover.id = 'timeline-hover';
+    timelineHover.setAttribute('role', 'tooltip');
+    timelineHover.removeAttribute('aria-hidden');
+    timelineHover.hidden = true;
+    timelineHoverAvatar?.classList.add('tl-hover-avatar');
+    timelineHoverText?.classList.add('tl-hover-title');
+    timelineHoverSurface?.classList.add('tl-hover-surface');
+    document.body.appendChild(timelineHover);
+    return true;
   }
 
-  function startOverviewCardReveal() {
-    stopOverviewCardReveal();
-    const cards = overviewContent.querySelectorAll('.gbv-card');
-    const immediate = overviewReducedMotion() || !('IntersectionObserver' in window);
-    if (!immediate) {
-      overviewRevealObserver = new IntersectionObserver((entries) => {
-        if (activeView !== 'cards') return;
-        for (const entry of entries) if (entry.isIntersecting) {
-          overviewRevealObserver.unobserve(entry.target);
-          overviewRevealQueue.add(entry.target);
-        }
-        if (overviewRevealQueue.size && !overviewRevealFrame) {
-          overviewRevealFrame = requestAnimationFrame(revealOverviewCards);
-        }
-      }, { root: overview, threshold: 0.01 });
+  function showTimelineTooltip(button, item, keyboard = false) {
+    if ((!keyboard && !timelineHoverMedia.matches) || activeView !== 'cards' ||
+        document.body.classList.contains('panel-open') || !ensureTimelineTooltip()) return;
+    hideTimelineTooltip();
+    timelineHoverButton = button;
+    U.setWFImage(timelineHoverAvatar, item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG);
+    U.setText(timelineHoverText, germanDisplayName(timelineName(item)));
+    U.setText(timelineHoverLatin, item.name?.lat || '');
+    U.setText(timelineHoverDate, String(timelineYear(item)));
+    normalizeExtinctionDate(timelineHoverDate);
+    const dateRow = timelineHoverDate?.closest('.globe-extinction-row');
+    if (dateRow) { dateRow.hidden = false; dateRow.style.removeProperty('display'); }
+    const rect = button.getBoundingClientRect();
+    const portrait = overviewRegion === 'hawaii';
+    timelineHover.classList.toggle('is-portrait', portrait);
+    timelineHover.style.setProperty('--tl-hover-avatar-size', `${portrait ? rect.width * 1.08 : 100}px`);
+    timelineHover.hidden = false;
+    const avatarSize = timelineHoverAvatar?.getBoundingClientRect().width || 100;
+    const cardStyle = getComputedStyle(timelineHoverSurface);
+    const paddingLeft = parseFloat(cardStyle.paddingLeft) || 12;
+    const paddingRight = parseFloat(cardStyle.paddingRight) || 24;
+    const width = timelineHover.offsetWidth;
+    const height = timelineHover.offsetHeight;
+    const viewport = window.visualViewport;
+    const leftEdge = (viewport?.offsetLeft || 0) + 8;
+    const rightEdge = (viewport?.offsetLeft || 0) + (viewport?.width || innerWidth) - 8;
+    const topEdge = (viewport?.offsetTop || 0) + 8;
+    const bottomEdge = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight) - 8;
+    let flipped = false;
+    let left = portrait ? rect.left + rect.width / 2 - avatarSize / 2 - paddingLeft : rect.right + 12;
+    if (left + width > rightEdge) {
+      flipped = true;
+      left = portrait ? rect.left + rect.width / 2 + avatarSize / 2 + paddingRight - width : rect.left - width - 12;
     }
-    cards.forEach((card) => {
-      card.classList.remove('is-revealed');
-      card.classList.toggle('is-reveal-pending', !immediate);
-      if (!immediate) overviewRevealObserver.observe(card);
+    timelineHoverSurface.style.setProperty('flex-direction', flipped ? 'row-reverse' : 'row', 'important');
+    timelineHover.style.left = `${U.clamp(left, leftEdge, Math.max(leftEdge, rightEdge - width))}px`;
+    timelineHover.style.top = `${U.clamp(rect.top + rect.height / 2 - height / 2, topEdge, Math.max(topEdge, bottomEdge - height))}px`;
+    button.classList.add('is-hovered');
+    button.setAttribute('aria-describedby', 'timeline-hover');
+  }
+
+  function makeTimelineMarker(item) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tl-marker';
+    button.dataset.species = item.id;
+    // Some data records share an ID; keep focus tied to this exact record.
+    button.dataset.timelineKey = String(ALL.indexOf(item));
+    button.setAttribute('aria-label', `${timelineName(item)}, ${timelineYear(item)} – Art öffnen`);
+    if (overviewRegion === 'hawaii') {
+      const image = document.createElement('img');
+      image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
+      image.src = item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG;
+      image.addEventListener('error', () => {
+        if (CONFIG.DEFAULT_TOOLTIP_IMG && image.getAttribute('src') !== CONFIG.DEFAULT_TOOLTIP_IMG) image.src = CONFIG.DEFAULT_TOOLTIP_IMG;
+      }, { once: true });
+      button.appendChild(image);
+    }
+    button.addEventListener('pointerenter', event => {
+      if (event.pointerType !== 'touch') showTimelineTooltip(button, item);
+    });
+    button.addEventListener('pointerleave', () => { if (timelineHoverButton === button) hideTimelineTooltip(); });
+    button.addEventListener('focus', () => { if (button.matches(':focus-visible')) showTimelineTooltip(button, item, true); });
+    button.addEventListener('blur', () => { if (timelineHoverButton === button) hideTimelineTooltip(); });
+    button.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); hideTimelineTooltip(); } });
+    button.addEventListener('click', async () => {
+      button.focus({ preventScroll: true });
+      hideTimelineTooltip();
+      setOverviewMenu(false);
+      await openSpeciesFromCard(item);
+      DOM.panelCloseBtn?.focus({ preventScroll: true });
+    });
+    return button;
+  }
+
+  function renderOverview(animate = true, resetScroll = true) {
+    if (!overviewDataReady || activeView !== 'cards') return;
+    const focusedId = overviewContent.contains(document.activeElement) ? document.activeElement.dataset.timelineKey : null;
+    const savedScroll = timelineScroller.scrollLeft;
+    hideTimelineTooltip();
+    overviewContent.setAttribute('aria-busy', 'true');
+    overview.classList.toggle('is-all-regions', overviewRegion === 'all');
+    const markerSize = overviewRegion === 'all' ? 20 : innerWidth <= 860 ? 52 : 70;
+    // Heading 50px + decade label 24px; columns consume all remaining height.
+    timelineRows = timelineRowCount(timelineScroller.clientHeight - 74, markerSize);
+    overview.style.setProperty('--tl-marker-size', `${markerSize}px`);
+    const fragment = document.createDocumentFragment();
+    const groups = timelineGroups(ALL, overviewRegion);
+    for (const group of groups) {
+      const section = document.createElement('section'); section.className = 'tl-group';
+      const heading = document.createElement('h2'); heading.className = 'tl-heading';
+      const title = document.createElement('span'); title.textContent = group.label;
+      const count = document.createElement('span'); count.className = 'tl-count';
+      count.textContent = `${group.items.length} ${group.items.length === 1 ? 'Art/Form' : 'Arten/Formen'}`;
+      heading.append(title, count);
+      const decades = document.createElement('div'); decades.className = 'tl-decades';
+      for (const [year, items] of group.decades) {
+        const decade = document.createElement('div'); decade.className = 'tl-decade';
+        decade.classList.toggle('is-empty', !items.length);
+        const label = document.createElement('h3'); label.className = 'tl-decade-label';
+        label.textContent = year ? String(year) : '';
+        const columns = document.createElement('div'); columns.className = 'tl-columns';
+        const columnCount = Math.max(1, Math.ceil(items.length / timelineRows));
+        for (let index = 0; index < columnCount; index++) {
+          const column = document.createElement('div'); column.className = 'tl-column';
+          for (const item of items.slice(index * timelineRows, (index + 1) * timelineRows)) column.appendChild(makeTimelineMarker(item));
+          columns.appendChild(column);
+        }
+        decade.append(label, columns); decades.appendChild(decade);
+      }
+      section.append(heading, decades); fragment.appendChild(section);
+    }
+    overviewContent.replaceChildren(fragment);
+    overviewRenderedRegion = overviewRegion;
+    overviewStatus.textContent = groups.length
+      ? `${groups.reduce((sum, group) => sum + group.items.length, 0)} Arten/Formen, ${overviewRegion === 'hawaii' ? 'Hawaii' : 'alle Regionen'}, nach Aussterbejahr. Arten ohne eindeutiges Jahr sind ausgeblendet.`
+      : 'Keine Arten mit eindeutigem Aussterbejahr vorhanden.';
+    overviewStatus.classList.toggle('is-sr-only', groups.length > 0);
+    overviewContent.setAttribute('aria-busy', 'false');
+    timelineScroller.scrollLeft = resetScroll ? 0 : savedScroll;
+    if (focusedId) [...overviewContent.querySelectorAll('.tl-marker')].find(button => button.dataset.timelineKey === focusedId)?.focus({ preventScroll: true });
+  }
+
+  function scheduleTimelineLayout() {
+    if (timelineLayoutFrame || activeView !== 'cards') return;
+    timelineLayoutFrame = requestAnimationFrame(() => {
+      timelineLayoutFrame = 0;
+      renderOverview(false, false);
+      if (overviewMenuOpen) positionOverviewMenu();
     });
   }
 
@@ -3516,187 +3545,21 @@ function renderFamilyCards(speciesList = []) {
     overviewOptions.style.top = `${rect.bottom + 2}px`;
     overviewOptions.style.width = `${rect.width}px`;
   }
+
   function isWithinOverviewSort(target) {
-    return overview.querySelector('.gbv-select').contains(target) || overviewOptions.contains(target);
+    return target instanceof Node && (overview.querySelector('.gbv-select').contains(target) || overviewOptions.contains(target));
   }
 
   function setOverviewMenu(open, focusOption = false) {
     overviewMenuOpen = open;
-    if (open) positionOverviewMenu();
-    overview.classList.toggle("is-sort-open", open);
-    overviewOptions.toggleAttribute('inert', !open);
-    overviewOptions.classList.toggle('is-open', open);
+    if (open) { hideTimelineTooltip(); positionOverviewMenu(); }
+    overviewOptions.hidden = !open;
     overviewSortButton.setAttribute('aria-expanded', String(open));
-    if (open && focusOption) overviewOptionButtons.find((button) => button.dataset.sort === overviewSort)?.focus();
-  }
-
-  function makeOverviewCard(item, styles) {
-    const card = buildSpeciesCard(item, { deferImage: true });
-    if (!card) return null;
-    const elements = [card, ...card.querySelectorAll('*')];
-    elements.forEach((element, index) => {
-      (styles[index] || []).forEach(([property, value]) => {
-        if (index === 0 && property === 'display') return;
-        element.style.setProperty(property, value);
-      });
-      element.removeAttribute('id');
-      element.removeAttribute('data-w-id');
-      element.removeAttribute('aria-labelledby');
-      element.removeAttribute('aria-describedby');
-    });
-    card.classList.add('gbv-card');
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', `${overviewName(item, overviewSort === 'lat' ? 'lat' : 'de')} – Art öffnen`);
-    card.tabIndex = 0;
-    card.addEventListener('keydown', (event) => {
-      if (event.target !== card || !['Enter', ' '].includes(event.key)) return;
-      event.preventDefault(); event.stopPropagation(); card.click();
-    });
-    U.setText(card.querySelector('.card-name-de'), overviewName(item));
-    if (overviewSort === 'lat') {
-      U.setText(card.querySelector('.card-name-de'), overviewName(item, 'lat'));
-      U.setText(card.querySelector('.card-name-lat'), item.name?.de || '');
-    }
-    const image = card.querySelector('.card-image');
-    const url = item.images?.panel || CONFIG.DEFAULT_PANEL_IMG;
-    if (image) {
-      image.removeAttribute('srcset'); image.removeAttribute('sizes');
-      if (image.tagName === 'IMG') {
-        image.addEventListener('error', () => {
-          if (CONFIG.DEFAULT_PANEL_IMG && image.getAttribute('src') !== CONFIG.DEFAULT_PANEL_IMG) U.setWFImage(image, CONFIG.DEFAULT_PANEL_IMG);
-        }, { once: true });
-        image.removeAttribute('src');
-        image.loading = 'lazy'; image.decoding = 'async';
-        image.setAttribute('fetchpriority', 'low');
-        image.alt = overviewName(item);
-      } else image.style.backgroundImage = 'none';
-      if (overviewImageObserver) overviewImageSources.set(image, url);
-      else U.setWFImage(image, url);
-    }
-    return card;
-  }
-
-  async function renderOverview(animate = true, resetScroll = true) {
-    if (!overviewDataReady || activeView !== 'cards') return;
-    if (!DOM.speciesCardTemplate) {
-      overviewStatus.textContent = 'Die bestehende Webflow-Kartenvorlage #species-card-template fehlt.';
-      return;
-    }
-    const token = ++overviewRenderToken;
-    overviewContent.setAttribute('aria-busy', 'true');
-    if (animate && overviewRenderedSort !== null) { overviewContent.classList.add('is-changing'); await overviewWait(125); }
-    if (token !== overviewRenderToken || activeView !== 'cards') return;
-    overviewImageObserver?.disconnect();
-    stopOverviewCardReveal();
-    const groups = overviewGroups(ALL, overviewSort);
-    const styles = snapshotSearchTooltipStyles(DOM.speciesCardTemplate);
-    const fragment = document.createDocumentFragment();
-    const sections = [];
-    let built = 0;
-    for (const [index, group] of groups.entries()) {
-      const section = document.createElement('section');
-      section.className = 'gbv-group';
-      section.id = `gbv-group-${index}`;
-      const heading = document.createElement('h2');
-      heading.className = 'gbv-heading';
-      heading.id = `${section.id}-heading`;
-      section.setAttribute('aria-labelledby', heading.id);
-      const title = document.createElement('span'); title.textContent = group.label;
-      const count = document.createElement('span'); count.className = 'gbv-count';
-      count.textContent = `${group.items.length} ${group.items.length === 1 ? 'Art/Form' : 'Arten/Formen'}`;
-      heading.append(title, count);
-      const grid = document.createElement('div'); grid.className = 'gbv-grid';
-      for (const item of group.items) {
-        const card = makeOverviewCard(item, styles);
-        if (card) {
-          if (!overviewReducedMotion() && 'IntersectionObserver' in window) card.classList.add('is-reveal-pending');
-          grid.appendChild(card);
-        }
-        if (++built % 48 === 0) {
-          await new Promise(requestAnimationFrame);
-          if (token !== overviewRenderToken || activeView !== 'cards') return;
-        }
-      }
-      section.append(heading, grid); fragment.appendChild(section);
-      sections.push({ key: group.key, section });
-    }
-    if (token !== overviewRenderToken || activeView !== 'cards') return;
-    overviewContent.replaceChildren(fragment);
-    overviewGroupsOnScreen = sections;
-    overviewRenderedSort = overviewSort;
-    const alphabetical = ['de', 'lat'].includes(overviewSort);
-    overview.classList.toggle('has-alphabet', alphabetical);
-    overviewAlphabet.hidden = !alphabetical;
-    overviewAlphabet.replaceChildren();
-    overviewAlphabetActive = null;
-    if (alphabetical) {
-      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-      if (groups.some((group) => group.key === '#')) letters.push('#');
-      for (const letter of letters) {
-        const button = document.createElement('button'); button.type = 'button';
-        button.textContent = letter; button.dataset.letter = letter;
-        button.setAttribute('aria-label', `Zum Buchstaben ${letter}`);
-        button.disabled = !groups.some((group) => group.key === letter);
-        overviewAlphabet.appendChild(button);
-      }
-    }
-    overviewContent.querySelectorAll('.card-image').forEach((image) => {
-      if (overviewImageSources.has(image)) overviewImageObserver?.observe(image);
-    });
-    if (resetScroll) {
-      overview.scrollTop = 0;
-      overviewHeaderLastScroll = 0; overviewHeaderTravel = 0;
-      setOverviewHeaderHidden(false);
-    }
-    const count = ALL.filter((item) => overviewRegions(item).length).length;
-    overviewStatus.textContent = `${count} Arten/Formen aus Hawaii, sortiert nach ${overviewSorts.find(([value]) => value === overviewSort)[1]}.`;
-    overviewStatus.classList.add('is-sr-only');
-    overviewContent.setAttribute('aria-busy', 'false');
-    requestAnimationFrame(() => {
-      if (token === overviewRenderToken && activeView === 'cards') { overviewContent.classList.remove('is-changing'); updateOverviewAlphabet(); startOverviewCardReveal(); }
-    });
-  }
-
-  function overviewHeadingOffset() {
-    const heading = overviewContent.querySelector('.gbv-heading');
-    return heading ? parseFloat(getComputedStyle(heading).top) || 0 : 0;
-  }
-
-  function updateOverviewStickyHeadings() {
-    const stickyTop = overview.getBoundingClientRect().top + overviewHeadingOffset();
-    for (const group of overviewGroupsOnScreen) {
-      const heading = group.section.querySelector('.gbv-heading');
-      if (!heading) continue;
-      // Clip a departing sticky title at the header edge, keeping the logo clear.
-      const clipped = Math.max(0, stickyTop - heading.getBoundingClientRect().top);
-      heading.style.setProperty('--gbv-title-clip', `${clipped}px`);
-    }
-  }
-
-  function updateOverviewAlphabet() {
-    overviewScrollFrame = 0;
-    updateOverviewStickyHeadings();
-    positionOverviewAlphabet();
-    if (overviewAlphabet.hidden) return;
-    let active = overviewGroupsOnScreen[0]?.key;
-    for (const group of overviewGroupsOnScreen) {
-      if (group.section.getBoundingClientRect().top <= overview.getBoundingClientRect().top + overviewHeadingOffset() + 1) active = group.key;
-      else break;
-    }
-    if (overview.scrollTop > 0 && overview.scrollTop + overview.clientHeight >= overview.scrollHeight - 2) active = overviewGroupsOnScreen.at(-1)?.key;
-    overviewAlphabet.querySelectorAll('button').forEach((button) => {
-      if (button.dataset.letter === active) {
-        button.setAttribute('aria-current', 'true');
-        if (overviewAlphabetActive !== active) {
-          overviewAlphabet.scrollTop = button.offsetTop - (overviewAlphabet.clientHeight - button.offsetHeight) / 2;
-        }
-      } else button.removeAttribute('aria-current');
-    });
-    overviewAlphabetActive = active;
+    if (open && focusOption) overviewOptionButtons.find(button => button.dataset.region === overviewRegion)?.focus();
   }
 
   function updateOverviewTabs(next) {
-    document.querySelectorAll('#globe-view-switch .gv-tab').forEach((button) => {
+    document.querySelectorAll('#globe-view-switch .gv-tab').forEach(button => {
       const selected = button.classList.contains(next === 'cards' ? 'gv-grid' : 'gv-globe');
       button.classList.toggle('is-active', selected); button.setAttribute('aria-pressed', String(selected));
     });
@@ -3705,68 +3568,54 @@ function renderFamilyCards(speciesList = []) {
   async function setOverviewView(next) {
     const token = ++overviewSwitchToken;
     if (activeView === next) { updateOverviewTabs(next); return; }
-    setOverviewMenu(false);
-    setOverviewHeaderHidden(false);
-    overviewHeaderLastScroll = overview.scrollTop; overviewHeaderTravel = 0;
-    setSearchOpen(false);
+    setOverviewMenu(false); hideTimelineTooltip(); setSearchOpen(false);
     await closeAllPanels(true);
     if (token !== overviewSwitchToken) return;
     if (next === 'cards') {
-      hawaiiFlightPending = false;
-      viewer.camera.cancelFlight();
-      hawaiiOverviewLocked = false;
+      hawaiiFlightPending = false; viewer.camera.cancelFlight(); hawaiiOverviewLocked = false;
       overviewCameraSnapshot = {
         destination: Cesium.Cartesian3.clone(viewer.camera.positionWC),
         direction: Cesium.Cartesian3.clone(viewer.camera.directionWC),
         up: Cesium.Cartesian3.clone(viewer.camera.upWC)
       };
-      activeView = 'cards';
-      updateOverviewTabs(next);
+      activeView = 'cards'; updateOverviewTabs(next);
       viewer.useDefaultRenderLoop = false;
       viewer.scene.screenSpaceCameraController.enableInputs = false;
-      DOM.globeHost.setAttribute('aria-hidden', 'true');
-      DOM.globeHost.setAttribute('inert', '');
+      DOM.globeHost.setAttribute('aria-hidden', 'true'); DOM.globeHost.setAttribute('inert', '');
       document.body.classList.add('globe-cards-view');
       overview.removeAttribute('inert'); overview.setAttribute('aria-hidden', 'false');
-      if (overviewRenderedSort !== overviewSort || overviewContent.getAttribute('aria-busy') === 'true') await renderOverview(false, true);
-      else startOverviewCardReveal();
-      overviewContent.querySelectorAll('.card-image').forEach((image) => {
-        if (overviewImageSources.has(image)) overviewImageObserver?.observe(image);
-      });
+      if (overviewRenderedRegion !== overviewRegion) renderOverview(false, true);
+      else scheduleTimelineLayout();
     } else {
-      activeView = 'globe';
-      stopOverviewCardReveal();
-      updateOverviewTabs(next);
-      ++overviewRenderToken;
+      activeView = 'globe'; updateOverviewTabs(next);
       document.body.classList.remove('globe-cards-view');
       overview.setAttribute('inert', ''); overview.setAttribute('aria-hidden', 'true');
       DOM.globeHost.removeAttribute('aria-hidden'); DOM.globeHost.removeAttribute('inert');
-      viewer.useDefaultRenderLoop = true;
-      viewer.resize();
+      viewer.useDefaultRenderLoop = true; viewer.resize();
       if (overviewCameraSnapshot) viewer.camera.setView({ destination: overviewCameraSnapshot.destination, orientation: { direction: overviewCameraSnapshot.direction, up: overviewCameraSnapshot.up } });
       viewer.scene.screenSpaceCameraController.enableInputs = !introActive;
       viewer.scene.requestRender?.();
     }
-
   }
 
+  document.querySelector('#globe-view-switch .gv-grid')?.setAttribute('aria-label', 'Zeitliste nach Aussterbejahr');
   document.querySelector('#globe-view-switch .gv-grid')?.addEventListener('click', () => setOverviewView('cards'));
   document.querySelector('#globe-view-switch .gv-globe')?.addEventListener('click', () => setOverviewView('globe'));
   overviewSortButton.addEventListener('click', () => setOverviewMenu(!overviewMenuOpen));
-  overviewSortButton.addEventListener('keydown', (event) => {
+  overviewSortButton.addEventListener('keydown', event => {
     if (['ArrowDown', 'ArrowUp'].includes(event.key)) { event.preventDefault(); setOverviewMenu(true, true); }
   });
-  overviewOptions.addEventListener('click', (event) => {
-    const option = event.target.closest('[data-sort]');
+  overviewOptions.addEventListener('click', event => {
+    const option = event.target.closest('[data-region]');
     if (!option) return;
-    const changed = overviewSort !== option.dataset.sort;
-    overviewSort = option.dataset.sort;
+    const changed = overviewRegion !== option.dataset.region;
+    overviewRegion = option.dataset.region;
     overview.querySelector('#gbv-sort-value').textContent = option.textContent;
-    overviewOptionButtons.forEach((button) => button.setAttribute('aria-selected', String(button === option)));
+    overviewOptionButtons.forEach(button => button.setAttribute('aria-selected', String(button === option)));
     setOverviewMenu(false); overviewSortButton.focus();
     if (changed) renderOverview();
   });
-  overviewOptions.addEventListener('keydown', (event) => {
+  overviewOptions.addEventListener('keydown', event => {
     const index = overviewOptionButtons.indexOf(document.activeElement);
     let target;
     if (event.key === 'ArrowDown') target = (index + 1) % overviewOptionButtons.length;
@@ -3776,51 +3625,54 @@ function renderFamilyCards(speciesList = []) {
     if (target !== undefined) { event.preventDefault(); overviewOptionButtons[target].focus(); }
     if (event.key === 'Tab') setOverviewMenu(false);
   });
-  overview.addEventListener('keydown', (event) => {
+  overview.addEventListener('keydown', event => {
     if (event.key === 'Escape' && overviewMenuOpen) { event.preventDefault(); event.stopImmediatePropagation(); setOverviewMenu(false); overviewSortButton.focus(); }
   }, true);
-  overviewAlphabet.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-letter]');
-    if (!button || button.disabled) return;
-    const group = overviewGroupsOnScreen.find((entry) => entry.key === button.dataset.letter);
-    if (group) {
-      if (innerWidth <= 860) setOverviewHeaderHidden(true);
-      const offset = innerWidth <= 860
-        ? parseFloat(getComputedStyle(overview).getPropertyValue('--gbv-mobile-safe-top')) || 0
-        : overviewHeadingOffset();
-      overview.scrollTo({ top: Math.max(0, overview.scrollTop + group.section.getBoundingClientRect().top - offset), behavior: overviewReducedMotion() ? 'instant' : 'smooth' });
-    }
+  timelineScroller.addEventListener('scroll', hideTimelineTooltip, { passive: true });
+  timelineScroller.addEventListener('wheel', event => {
+    if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY) || !event.deltaY) return;
+    const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? timelineScroller.clientWidth : 1);
+    const before = timelineScroller.scrollLeft;
+    timelineScroller.scrollLeft += delta;
+    if (before !== timelineScroller.scrollLeft) event.preventDefault();
+  }, { passive: false });
+  // Mouse dragging complements native touch scrolling without stealing clicks.
+  let timelineDrag = null;
+  let timelineSuppressClickUntil = 0;
+  timelineScroller.addEventListener('pointerdown', event => {
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    timelineDrag = { id: event.pointerId, x: event.clientX, left: timelineScroller.scrollLeft, moved: false };
   });
-  overview.addEventListener('scroll', () => {
-    updateOverviewScrollHeader();
-    if (overviewMenuOpen) positionOverviewMenu();
-    if (!overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
-  }, { passive: true });
-  overview.addEventListener('click', (event) => event.stopPropagation());
-  overview.addEventListener('focusout', (event) => {
-    if (!isWithinOverviewSort(event.relatedTarget)) setOverviewMenu(false);
+  timelineScroller.addEventListener('pointermove', event => {
+    if (!timelineDrag || timelineDrag.id !== event.pointerId || !(event.buttons & 1)) return;
+    const delta = event.clientX - timelineDrag.x;
+    if (!timelineDrag.moved && Math.abs(delta) < 5) return;
+    timelineDrag.moved = true; hideTimelineTooltip();
+    timelineScroller.setPointerCapture(event.pointerId);
+    timelineScroller.classList.add('is-dragging');
+    timelineScroller.scrollLeft = timelineDrag.left - delta;
+    event.preventDefault();
   });
-  document.addEventListener('pointerdown', (event) => {
-    if (!isWithinOverviewSort(event.target)) setOverviewMenu(false);
-  });
-
-  addEventListener('resize', () => {
-    if (innerWidth > 860) setOverviewHeaderHidden(false);
-    if (overviewMenuOpen) positionOverviewMenu();
-    if (activeView === 'cards' && !overviewScrollFrame) overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
-  });
-
-  window.visualViewport?.addEventListener('resize', () => {
-    if (activeView === 'cards') positionOverviewAlphabet();
-  });
-  document.addEventListener('focusin', event => {
-    if (event.target.closest?.('#globe-brand, #globe-view-switch, #globe-search, .gbv-toolbar')) setOverviewHeaderHidden(false);
-  });
-  overview.addEventListener('transitionend', event => {
-    if (event.propertyName === 'top' && event.target.classList.contains('gbv-heading') && !overviewScrollFrame) {
-      overviewScrollFrame = requestAnimationFrame(updateOverviewAlphabet);
-    }
-  });
+  const finishTimelineDrag = event => {
+    if (!timelineDrag || timelineDrag.id !== event.pointerId) return;
+    if (timelineDrag.moved) timelineSuppressClickUntil = performance.now() + 250;
+    timelineDrag = null; timelineScroller.classList.remove('is-dragging');
+    if (timelineScroller.hasPointerCapture(event.pointerId)) timelineScroller.releasePointerCapture(event.pointerId);
+  };
+  addEventListener('pointerup', finishTimelineDrag);
+  addEventListener('pointercancel', finishTimelineDrag);
+  timelineScroller.addEventListener('click', event => {
+    if (performance.now() < timelineSuppressClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
+  }, true);
+  overview.addEventListener('click', event => event.stopPropagation());
+  overview.addEventListener('focusout', event => { if (!isWithinOverviewSort(event.relatedTarget)) setOverviewMenu(false); });
+  document.addEventListener('pointerdown', event => { if (!isWithinOverviewSort(event.target)) setOverviewMenu(false); });
+  addEventListener('resize', scheduleTimelineLayout);
+  window.visualViewport?.addEventListener('resize', scheduleTimelineLayout);
+  if ('ResizeObserver' in window) new ResizeObserver(scheduleTimelineLayout).observe(timelineScroller);
+  new MutationObserver(() => {
+    if (document.body.classList.contains('panel-open') || document.body.classList.contains('globe-search-open')) hideTimelineTooltip();
+  }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   const searchRoot = document.createElement('section');
   searchRoot.id = 'globe-search';
