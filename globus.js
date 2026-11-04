@@ -3306,23 +3306,26 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function timelineGroups(items, region) {
-    const dated = items.filter(item => timelineYear(item) !== null &&
+    const currentYear = new Date().getFullYear();
+    const dated = items.filter(item => timelineYear(item) !== null && timelineYear(item) <= currentYear &&
       (region === 'all' || timelineIsHawaii(item))).sort((a, b) =>
         timelineYear(a) - timelineYear(b) || timelineCollator.compare(timelineName(a), timelineName(b)));
     const groups = new Map();
     for (const item of dated) {
       const year = timelineYear(item);
       const century = year < 1800 ? 0 : Math.floor(year / 100) * 100;
-      if (!groups.has(century)) groups.set(century, { key: century, label: century ? String(century) : '1000–1799', items: [], decades: new Map() });
+      if (!groups.has(century)) groups.set(century, { key: century, label: century ? String(century) : 'vor 1800', items: [], decades: new Map() });
       const group = groups.get(century);
       group.items.push(item);
       const decade = century ? Math.floor(year / 10) * 10 : 0;
       if (!group.decades.has(decade)) group.decades.set(decade, []);
       group.decades.get(decade).push(item);
     }
-    // Retain the empty decades of each displayed century for orientation.
+    // Retain empty decades, stopping at the current decade in this century.
+    const currentDecade = Math.floor(currentYear / 10) * 10;
     for (const group of groups.values()) if (group.key) {
-      for (let year = group.key; year < group.key + 100; year += 10) {
+      const lastDecade = Math.min(group.key + 90, currentDecade);
+      for (let year = group.key; year <= lastDecade; year += 10) {
         if (!group.decades.has(year)) group.decades.set(year, []);
       }
       group.decades = new Map([...group.decades].sort((a, b) => a[0] - b[0]));
@@ -3330,8 +3333,19 @@ function renderFamilyCards(speciesList = []) {
     return [...groups.values()];
   }
 
-  function timelineRowCount(height, markerSize, gap = 12) {
-    return Math.max(1, Math.floor((Math.max(0, height - 16) + gap) / (markerSize + gap)));
+  function timelinePointLayout(height, groups) {
+    // Figma: four columns before 1800, one column for every later decade.
+    const largestStack = Math.max(1, ...groups.flatMap(group => group.key
+      ? [...group.decades.values()].map(items => items.length)
+      : [Math.ceil(group.items.length / 4)]));
+    // Heading 58px + decade label 18px + content bottom 8px + column padding 16px.
+    const available = Math.max(0, height - 100);
+    // Keep 12px gaps while possible; extremely short viewports also reduce gaps.
+    const minimumPoint = Math.min(1, available / largestStack);
+    const gap = largestStack > 1
+      ? Math.min(12, Math.max(0, (available - minimumPoint * largestStack) / (largestStack - 1))) : 12;
+    const markerSize = Math.min(30, Math.max(0, (available - gap * (largestStack - 1)) / largestStack));
+    return { markerSize, gap, largestStack };
   }
 
   const overview = document.createElement('section');
@@ -3365,7 +3379,6 @@ function renderFamilyCards(speciesList = []) {
   let overviewSwitchToken = 0;
   let overviewReturnFocus = null;
   let overviewMenuOpen = false;
-  let timelineRows = 0;
   let timelineLayoutFrame = 0;
   let timelineHover = null;
   let timelineHoverButton = null;
@@ -3420,14 +3433,7 @@ function renderFamilyCards(speciesList = []) {
     const dateRow = timelineHoverDate?.closest('.globe-extinction-row');
     if (dateRow) { dateRow.hidden = false; dateRow.style.removeProperty('display'); }
     const rect = button.getBoundingClientRect();
-    const portrait = overviewRegion === 'hawaii';
-    timelineHover.classList.toggle('is-portrait', portrait);
-    timelineHover.style.setProperty('--tl-hover-avatar-size', `${portrait ? rect.width * 1.08 : 100}px`);
     timelineHover.hidden = false;
-    const avatarSize = timelineHoverAvatar?.getBoundingClientRect().width || 100;
-    const cardStyle = getComputedStyle(timelineHoverSurface);
-    const paddingLeft = parseFloat(cardStyle.paddingLeft) || 12;
-    const paddingRight = parseFloat(cardStyle.paddingRight) || 24;
     const width = timelineHover.offsetWidth;
     const height = timelineHover.offsetHeight;
     const viewport = window.visualViewport;
@@ -3436,10 +3442,10 @@ function renderFamilyCards(speciesList = []) {
     const topEdge = (viewport?.offsetTop || 0) + 8;
     const bottomEdge = (viewport?.offsetTop || 0) + (viewport?.height || innerHeight) - 8;
     let flipped = false;
-    let left = portrait ? rect.left + rect.width / 2 - avatarSize / 2 - paddingLeft : rect.right + 12;
+    let left = rect.right + 12;
     if (left + width > rightEdge) {
       flipped = true;
-      left = portrait ? rect.left + rect.width / 2 + avatarSize / 2 + paddingRight - width : rect.left - width - 12;
+      left = rect.left - width - 12;
     }
     timelineHoverSurface.style.setProperty('flex-direction', flipped ? 'row-reverse' : 'row', 'important');
     timelineHover.style.left = `${U.clamp(left, leftEdge, Math.max(leftEdge, rightEdge - width))}px`;
@@ -3456,15 +3462,6 @@ function renderFamilyCards(speciesList = []) {
     // Some data records share an ID; keep focus tied to this exact record.
     button.dataset.timelineKey = String(ALL.indexOf(item));
     button.setAttribute('aria-label', `${timelineName(item)}, ${timelineYear(item)} – Art öffnen`);
-    if (overviewRegion === 'hawaii') {
-      const image = document.createElement('img');
-      image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
-      image.src = item.images?.tooltip || CONFIG.DEFAULT_TOOLTIP_IMG;
-      image.addEventListener('error', () => {
-        if (CONFIG.DEFAULT_TOOLTIP_IMG && image.getAttribute('src') !== CONFIG.DEFAULT_TOOLTIP_IMG) image.src = CONFIG.DEFAULT_TOOLTIP_IMG;
-      }, { once: true });
-      button.appendChild(image);
-    }
     button.addEventListener('pointerenter', event => {
       if (event.pointerType !== 'touch') showTimelineTooltip(button, item);
     });
@@ -3488,13 +3485,13 @@ function renderFamilyCards(speciesList = []) {
     const savedScroll = timelineScroller.scrollLeft;
     hideTimelineTooltip();
     overviewContent.setAttribute('aria-busy', 'true');
-    overview.classList.toggle('is-all-regions', overviewRegion === 'all');
-    const markerSize = overviewRegion === 'all' ? 20 : innerWidth <= 860 ? 52 : 70;
-    // Heading 50px + decade label 24px; columns consume all remaining height.
-    timelineRows = timelineRowCount(timelineScroller.clientHeight - 74, markerSize);
-    overview.style.setProperty('--tl-marker-size', `${markerSize}px`);
-    const fragment = document.createDocumentFragment();
     const groups = timelineGroups(ALL, overviewRegion);
+    // Use the full dataset for sizing so both region views have identical dots.
+    const sizingGroups = overviewRegion === 'all' ? groups : timelineGroups(ALL, 'all');
+    const layout = timelinePointLayout(timelineScroller.clientHeight, sizingGroups);
+    overview.style.setProperty('--tl-marker-size', `${layout.markerSize}px`);
+    overview.style.setProperty('--tl-marker-gap', `${layout.gap}px`);
+    const fragment = document.createDocumentFragment();
     for (const group of groups) {
       const section = document.createElement('section'); section.className = 'tl-group';
       const heading = document.createElement('h2'); heading.className = 'tl-heading';
@@ -3509,10 +3506,11 @@ function renderFamilyCards(speciesList = []) {
         const label = document.createElement('h3'); label.className = 'tl-decade-label';
         label.textContent = year ? String(year) : '';
         const columns = document.createElement('div'); columns.className = 'tl-columns';
-        const columnCount = Math.max(1, Math.ceil(items.length / timelineRows));
+        const columnCount = group.key ? 1 : 4;
+        const itemsPerColumn = group.key ? items.length : Math.ceil(items.length / 4);
         for (let index = 0; index < columnCount; index++) {
           const column = document.createElement('div'); column.className = 'tl-column';
-          for (const item of items.slice(index * timelineRows, (index + 1) * timelineRows)) column.appendChild(makeTimelineMarker(item));
+          for (const item of items.slice(index * itemsPerColumn, (index + 1) * itemsPerColumn)) column.appendChild(makeTimelineMarker(item));
           columns.appendChild(column);
         }
         decade.append(label, columns); decades.appendChild(decade);
