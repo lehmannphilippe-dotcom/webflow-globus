@@ -3334,10 +3334,10 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function timelinePointLayout(height, groups) {
-    // Figma: four columns before 1800, one column for every later decade.
-    const largestStack = Math.max(1, ...groups.flatMap(group => group.key
-      ? [...group.decades.values()].map(items => items.length)
-      : [Math.ceil(group.items.length / 4)]));
+    // Only the single-column decades determine the shared point size.
+    // The pre-1800 group flows into as many full-height columns as needed.
+    const largestStack = Math.max(1, ...groups.filter(group => group.key)
+      .flatMap(group => [...group.decades.values()].map(items => items.length)));
     // Heading 58px + decade label 18px + content bottom 8px + column padding 16px.
     const available = Math.max(0, height - 100);
     // Keep 12px gaps while possible; extremely short viewports also reduce gaps.
@@ -3345,7 +3345,9 @@ function renderFamilyCards(speciesList = []) {
     const gap = largestStack > 1
       ? Math.min(12, Math.max(0, (available - minimumPoint * largestStack) / (largestStack - 1))) : 12;
     const markerSize = Math.min(30, Math.max(0, (available - gap * (largestStack - 1)) / largestStack));
-    return { markerSize, gap, largestStack };
+    const pitch = markerSize + gap;
+    const rowsPerColumn = Math.max(1, Math.floor((available + gap + 1e-7) / (pitch || 1)));
+    return { markerSize, gap, largestStack, rowsPerColumn };
   }
 
   const overview = document.createElement('section');
@@ -3506,8 +3508,8 @@ function renderFamilyCards(speciesList = []) {
         const label = document.createElement('h3'); label.className = 'tl-decade-label';
         label.textContent = year ? String(year) : '';
         const columns = document.createElement('div'); columns.className = 'tl-columns';
-        const columnCount = group.key ? 1 : 4;
-        const itemsPerColumn = group.key ? items.length : Math.ceil(items.length / 4);
+        const itemsPerColumn = group.key ? items.length : layout.rowsPerColumn;
+        const columnCount = group.key ? 1 : Math.max(1, Math.ceil(items.length / itemsPerColumn));
         for (let index = 0; index < columnCount; index++) {
           const column = document.createElement('div'); column.className = 'tl-column';
           for (const item of items.slice(index * itemsPerColumn, (index + 1) * itemsPerColumn)) column.appendChild(makeTimelineMarker(item));
