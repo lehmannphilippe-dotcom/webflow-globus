@@ -1654,12 +1654,12 @@ body.panel-open #species-browser { pointer-events: none; }
 #species-browser .tl-decade-label { color: #fff; font: 500 14px/18px "Rubik Variablefont Wght", sans-serif; margin: 0; flex: 0 0 18px; }
 #species-browser .tl-columns { display: flex; height: 100%; flex: 1 1 auto; min-height: 0; }
 #species-browser .tl-column { position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--tl-marker-gap); width: 46px; flex: 0 0 auto; height: 100%; padding: 28px 8px 8px; box-sizing: border-box; background: #1d214a; transition: background-color 160ms ease-out; }
-#species-browser .tl-column-count { position: absolute; top: 2px; left: 0; width: 100%; text-align: center; color: #fff; font: 400 14px/14px "Rubik Variablefont Wght", sans-serif; opacity: 0; pointer-events: none; }
-#species-browser .tl-column:focus-within { background-color: #3f4c80; }
-#species-browser .tl-column:focus-within .tl-column-count { opacity: 1; }
+#species-browser .tl-column-count { position: absolute; top: 4px; left: 4px; right: 4px; text-align: left; color: #fff; font: 400 14px/14px "Rubik Variablefont Wght", sans-serif; opacity: 0; pointer-events: none; }
+#species-browser .tl-column.is-hoverable:focus-within { background-color: #3f4c80; }
+#species-browser .tl-column.is-hoverable:focus-within .tl-column-count { opacity: 1; }
 @media (hover: hover) {
-  #species-browser .tl-column:hover { background-color: #3f4c80; }
-  #species-browser .tl-column:hover .tl-column-count { opacity: 1; }
+  #species-browser .tl-column.is-hoverable:hover { background-color: #3f4c80; }
+  #species-browser .tl-column.is-hoverable:hover .tl-column-count { opacity: 1; }
 }
 #species-browser .tl-column.has-timeline-info { padding-bottom: 46px; }
 #species-browser .tl-info { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; width: 42px; height: 42px; margin: 0; padding: 0; border: 0; background: transparent; cursor: default; }
