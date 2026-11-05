@@ -3334,17 +3334,22 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function timelinePointLayout(height, groups) {
-    // Only the single-column decades determine the shared point size.
-    // The pre-1800 group flows into as many full-height columns as needed.
-    const largestStack = Math.max(1, ...groups.filter(group => group.key)
-      .flatMap(group => [...group.decades.values()].map(items => items.length)));
-    // Heading 58px + decade label 18px + content bottom 8px + column padding 16px.
-    const available = Math.max(0, height - 100);
-    // Keep 12px gaps while possible; extremely short viewports also reduce gaps.
-    const minimumPoint = Math.min(1, available / largestStack);
-    const gap = largestStack > 1
-      ? Math.min(12, Math.max(0, (available - minimumPoint * largestStack) / (largestStack - 1))) : 12;
-    const markerSize = Math.min(30, Math.max(0, (available - gap * (largestStack - 1)) / largestStack));
+    // Reserve space for the column count, plus the existing title and labels.
+    const available = Math.max(0, height - 120);
+    const lastGroup = groups.at(-1);
+    const lastDecade = lastGroup ? [...lastGroup.decades.keys()].at(-1) : null;
+    // The info icon needs 26px + 12px spacing if the final decade has species.
+    const stacks = groups.filter(group => group.key).flatMap(group =>
+      [...group.decades].filter(([, items]) => items.length).map(([year, items]) => ({
+        count: items.length,
+        room: Math.max(0, available - (group === lastGroup && year === lastDecade ? 38 : 0))
+      })));
+    if (!stacks.length) stacks.push({ count: 1, room: available });
+    const largestStack = Math.max(...stacks.map(stack => stack.count));
+    const gap = Math.min(12, ...stacks.map(({ count, room }) => count > 1
+      ? Math.max(0, (room - Math.min(1, room / count) * count) / (count - 1)) : 12));
+    const markerSize = Math.min(30, ...stacks.map(({ count, room }) =>
+      Math.max(0, (room - gap * (count - 1)) / count)));
     const pitch = markerSize + gap;
     const rowsPerColumn = Math.max(1, Math.floor((available + gap + 1e-7) / (pitch || 1)));
     return { markerSize, gap, largestStack, rowsPerColumn };
@@ -3390,6 +3395,39 @@ function renderFamilyCards(speciesList = []) {
   let timelineHoverLatin = null;
   let timelineHoverDate = null;
   const timelineHoverMedia = matchMedia('(hover: hover) and (pointer: fine)');
+  // Keep pointer and keyboard search highlighting independent.
+  let timelineSearchPointer = null;
+  let timelineSearchFocus = null;
+
+  function refreshTimelineSearchHighlights() {
+    const searchOpen = document.getElementById('globe-search')?.classList.contains('is-open');
+    const hovered = timelineSearchPointer?.card.isConnected ? timelineSearchPointer : null;
+    const focused = timelineSearchFocus?.card.isConnected ? timelineSearchFocus : null;
+    const entry = activeView === 'cards' && searchOpen && !document.body.classList.contains('panel-open')
+      ? (hovered || focused)?.entry : null;
+    // Compare source records, not IDs: some different species share an ID.
+    const records = new Set(entry ? entry.type === 'species' ? [entry.item] : entry.species || [] : []);
+    overviewContent.querySelectorAll('.tl-marker').forEach(button => {
+      button.classList.toggle('is-search-match', records.has(ALL[Number(button.dataset.timelineKey)]));
+    });
+  }
+
+  function setTimelineSearchHover(entry, card, kind, active) {
+    if (kind === 'pointer') {
+      if (active) timelineSearchPointer = { entry, card };
+      else if (timelineSearchPointer?.card === card) timelineSearchPointer = null;
+    } else {
+      if (active) timelineSearchFocus = { entry, card };
+      else if (timelineSearchFocus?.card === card) timelineSearchFocus = null;
+    }
+    if (active) hideTimelineTooltip();
+    refreshTimelineSearchHighlights();
+  }
+
+  function clearTimelineSearchHighlights() {
+    timelineSearchPointer = null; timelineSearchFocus = null;
+    refreshTimelineSearchHighlights();
+  }
 
   function hideTimelineTooltip() {
     timelineHoverButton?.classList.remove('is-hovered');
@@ -3516,14 +3554,28 @@ function renderFamilyCards(speciesList = []) {
         const columnCount = group.key ? 1 : Math.max(1, Math.ceil(items.length / itemsPerColumn));
         for (let index = 0; index < columnCount; index++) {
           const column = document.createElement('div'); column.className = 'tl-column';
-          for (const item of items.slice(index * itemsPerColumn, (index + 1) * itemsPerColumn)) column.appendChild(makeTimelineMarker(item));
+          const columnItems = items.slice(index * itemsPerColumn, (index + 1) * itemsPerColumn);
+          const columnCount = document.createElement('span'); columnCount.className = 'tl-column-count';
+          columnCount.setAttribute('aria-hidden', 'true'); columnCount.textContent = String(columnItems.length);
+          column.appendChild(columnCount);
+          for (const item of columnItems) column.appendChild(makeTimelineMarker(item));
           columns.appendChild(column);
         }
         decade.append(label, columns); decades.appendChild(decade);
       }
       section.append(heading, decades); fragment.appendChild(section);
     }
+    const lastColumn = fragment.querySelector('.tl-group:last-child .tl-decade:last-child .tl-column:last-child');
+    if (lastColumn) {
+      const info = document.createElement('button'); info.type = 'button'; info.className = 'tl-info';
+      info.setAttribute('aria-label', 'Informationen zur Zeitliste'); info.setAttribute('aria-disabled', 'true');
+      const icon = document.createElement('span'); icon.setAttribute('aria-hidden', 'true'); info.appendChild(icon);
+      // Intentionally no action until the information content is available.
+      info.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); });
+      lastColumn.classList.add('has-timeline-info'); lastColumn.appendChild(info);
+    }
     overviewContent.replaceChildren(fragment);
+    refreshTimelineSearchHighlights();
     overviewRenderedRegion = overviewRegion;
     overviewStatus.textContent = groups.length
       ? `${groups.reduce((sum, group) => sum + group.items.length, 0)} Arten/Formen, ${overviewRegion === 'hawaii' ? 'Hawaii' : 'alle Regionen'}, nach Aussterbejahr. Arten ohne eindeutiges Jahr sind ausgeblendet.`
@@ -3676,6 +3728,7 @@ function renderFamilyCards(speciesList = []) {
   if ('ResizeObserver' in window) new ResizeObserver(scheduleTimelineLayout).observe(timelineScroller);
   new MutationObserver(() => {
     if (document.body.classList.contains('panel-open') || document.body.classList.contains('globe-search-open')) hideTimelineTooltip();
+    if (document.body.classList.contains('panel-open') || !document.body.classList.contains('globe-search-open')) clearTimelineSearchHighlights();
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   const searchRoot = document.createElement('section');
@@ -3702,6 +3755,7 @@ function renderFamilyCards(speciesList = []) {
     .replace(/[ʻ’']/g, '').trim();
 
   function setSearchOpen(open, focus = false) {
+    if (!open) clearTimelineSearchHighlights();
     searchRoot.classList.toggle('is-open', open);
     document.body.classList.toggle('globe-search-open', open);
     searchLaunch.setAttribute('aria-expanded', String(open));
@@ -3870,6 +3924,12 @@ function renderFamilyCards(speciesList = []) {
       count.append(number, label);
       avatar.replaceWith(count);
     }
+    card.addEventListener('pointerenter', event => {
+      if (event.pointerType !== 'touch' && timelineHoverMedia.matches) setTimelineSearchHover(entry, card, 'pointer', true);
+    });
+    card.addEventListener('pointerleave', () => setTimelineSearchHover(entry, card, 'pointer', false));
+    card.addEventListener('focus', () => setTimelineSearchHover(entry, card, 'focus', true));
+    card.addEventListener('blur', () => setTimelineSearchHover(entry, card, 'focus', false));
     card.addEventListener('click', (event) => {
       event.preventDefault();
       openSearchResult(entry);
@@ -3884,6 +3944,7 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function renderSearchResults() {
+    clearTimelineSearchHighlights();
     const query = searchNormalize(searchInput.value);
     searchResults.replaceChildren();
     searchResults.scrollTop = 0;
