@@ -3555,9 +3555,12 @@ function renderFamilyCards(speciesList = []) {
         for (let index = 0; index < columnCount; index++) {
           const column = document.createElement('div'); column.className = 'tl-column';
           const columnItems = items.slice(index * itemsPerColumn, (index + 1) * itemsPerColumn);
-          const columnCount = document.createElement('span'); columnCount.className = 'tl-column-count';
-          columnCount.setAttribute('aria-hidden', 'true'); columnCount.textContent = String(columnItems.length);
-          column.appendChild(columnCount);
+          if (group.key) {
+            column.classList.add('is-hoverable');
+            const countLabel = document.createElement('span'); countLabel.className = 'tl-column-count';
+            countLabel.setAttribute('aria-hidden', 'true'); countLabel.textContent = String(columnItems.length);
+            column.appendChild(countLabel);
+          }
           for (const item of columnItems) column.appendChild(makeTimelineMarker(item));
           columns.appendChild(column);
         }
