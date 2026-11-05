@@ -520,6 +520,7 @@
   // INTRO — shown on every page load, never stored in the browser.
   // =========================================================
   let activeView = "globe";
+  let timelinePanelRecords = null;
   let overviewCameraSnapshot = null;
   let introActive = true;
   let introPointsReady = false;
@@ -1704,6 +1705,11 @@
         viewer.scene.screenSpaceCameraController.enableInputs = activeView === "globe" && !introActive && !hawaiiFlightActive && !hawaiiFlightPending;
       }
     }
+    if (!open) timelinePanelRecords = null;
+    if (document.getElementById('species-browser')) {
+      if (open) refreshTimelineSearchHighlights();
+      else clearTimelineSearchHighlights();
+    }
     requestViewerResize();
   }
 
@@ -2517,6 +2523,7 @@
   // =========================================================
   function fillPanel(item) {
     if (!item) return;
+    setTimelinePanelRecords([item]);
     activeSpeciesItem = item;
 
     updateAIImageInfoButton(item);
@@ -2543,6 +2550,7 @@
 
   function fillFamilyPanel(familyItem, speciesList = []) {
     if (!familyItem) return;
+    setTimelinePanelRecords(speciesList);
 
     const speciesCount = speciesList.length;
     const genusCount = new Set(
@@ -2577,6 +2585,7 @@
 
   function fillGenusPanel(genusItem, speciesList = []) {
     if (!genusItem) return;
+    setTimelinePanelRecords(speciesList);
 
     const speciesCount = speciesList.length;
     const genusDate = genusItem?.extinction_date || "";
@@ -2898,6 +2907,8 @@ function renderFamilyCards(speciesList = []) {
     restoreSpeciesView(immediateCameraReturn === true);
     if (activeView === 'cards' && overviewReturnFocus?.isConnected) {
       overviewReturnFocus.focus({ preventScroll: true });
+      // Restore keyboard focus without immediately reactivating its hover marker.
+      hideTimelineTooltip();
       overviewReturnFocus = null;
     }
   }
@@ -3399,14 +3410,22 @@ function renderFamilyCards(speciesList = []) {
   let timelineSearchPointer = null;
   let timelineSearchFocus = null;
 
+  function setTimelinePanelRecords(records) {
+    timelinePanelRecords = activeView === 'cards' ? [...records] : null;
+    if (document.getElementById('species-browser')) refreshTimelineSearchHighlights();
+  }
+
   function refreshTimelineSearchHighlights() {
     const searchOpen = document.getElementById('globe-search')?.classList.contains('is-open');
     const hovered = timelineSearchPointer?.card.isConnected ? timelineSearchPointer : null;
     const focused = timelineSearchFocus?.card.isConnected ? timelineSearchFocus : null;
-    const entry = activeView === 'cards' && searchOpen && !document.body.classList.contains('panel-open')
-      ? (hovered || focused)?.entry : null;
+    const panelOpen = document.body.classList.contains('panel-open');
+    const entry = searchOpen && !panelOpen ? (hovered || focused)?.entry : null;
+    // The opened panel owns the selection independently of search hover/focus.
     // Compare source records, not IDs: some different species share an ID.
-    const records = new Set(entry ? entry.type === 'species' ? [entry.item] : entry.species || [] : []);
+    const records = new Set(activeView !== 'cards' ? [] : panelOpen
+      ? timelinePanelRecords || []
+      : entry ? entry.type === 'species' ? [entry.item] : entry.species || [] : []);
     overviewContent.querySelectorAll('.tl-marker').forEach(button => {
       button.classList.toggle('is-search-match', records.has(ALL[Number(button.dataset.timelineKey)]));
     });
