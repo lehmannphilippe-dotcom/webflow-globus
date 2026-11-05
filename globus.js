@@ -3357,7 +3357,7 @@ function renderFamilyCards(speciesList = []) {
   overview.setAttribute('inert', '');
   overview.innerHTML = `
     <div class="gbv-toolbar">
-      <span id="gbv-sort-caption" class="gbv-caption">Sortieren nach:</span>
+      <span id="gbv-sort-caption" class="gbv-caption">Region:</span>
       <div class="gbv-select">
         <button type="button" id="gbv-sort" class="gbv-sort" aria-haspopup="listbox" aria-expanded="false" aria-controls="gbv-options" aria-labelledby="gbv-sort-caption gbv-sort-value"><span id="gbv-sort-value">Hawaii</span><span class="gbv-chevron" aria-hidden="true"></span></button>
       </div>
@@ -3497,7 +3497,11 @@ function renderFamilyCards(speciesList = []) {
     for (const group of groups) {
       const section = document.createElement('section'); section.className = 'tl-group';
       const heading = document.createElement('h2'); heading.className = 'tl-heading';
-      const title = document.createElement('span'); title.textContent = group.label;
+      const title = document.createElement('span');
+      if (group.key === 0) {
+        const prefix = document.createElement('span'); prefix.className = 'tl-before-prefix'; prefix.textContent = 'vor';
+        title.append(prefix, document.createTextNode(' 1800'));
+      } else title.textContent = group.label;
       const count = document.createElement('span'); count.className = 'tl-count';
       count.textContent = `${group.items.length} ${group.items.length === 1 ? 'Art/Form' : 'Arten/Formen'}`;
       heading.append(title, count);
