@@ -1690,6 +1690,11 @@
     document.body.style.setProperty('--panel-shift', '0px');
   }
 
+  function updatePanelTheme() {
+    const theme = document.querySelector('meta[name="theme-color"]');
+    if (theme) theme.content = document.body.classList.contains('panel-open') && innerWidth <= 860 ? '#121641' : '#04052a';
+  }
+
   function setPanelOpen(open) {
     document.getElementById('species-browser')?.toggleAttribute('inert', open || activeView !== 'cards');
     if (open) {
@@ -1705,7 +1710,8 @@
         viewer.scene.screenSpaceCameraController.enableInputs = activeView === "globe" && !introActive && !hawaiiFlightActive && !hawaiiFlightPending;
       }
     }
-    if (!open) timelinePanelRecords = null;
+    if (!open) { timelinePanelRecords = null; timelineTappedColumnKey = null; }
+    updatePanelTheme();
     if (document.getElementById('species-browser')) {
       if (open) refreshTimelineSearchHighlights();
       else clearTimelineSearchHighlights();
@@ -2909,6 +2915,7 @@ function renderFamilyCards(speciesList = []) {
       overviewReturnFocus.focus({ preventScroll: true });
       // Restore keyboard focus without immediately reactivating its hover marker.
       hideTimelineTooltip();
+      overviewReturnFocus.closest('.tl-column')?.classList.add('is-focus-restored');
       overviewReturnFocus = null;
     }
   }
@@ -3274,11 +3281,12 @@ function renderFamilyCards(speciesList = []) {
     const brand = document.createElement('div');
     brand.id = 'globe-brand';
     brand.innerHTML = `
-      <span class="gb-logo" role="img" aria-label="The Silent Globe Hawaii"></span>
+      <button type="button" class="gb-logo" aria-label="The Silent Globe – Intro neu starten"><span class="gb-mobile-name">THE SILENT<br>GLOBE</span></button>
       <button type="button" class="gb-info" aria-label="Informationen zu The Silent Globe">
         <span class="gb-info-default" aria-hidden="true"></span>
         <span class="gb-info-hover" aria-hidden="true"></span>
       </button>`;
+    brand.querySelector('.gb-logo').addEventListener('click', () => window.location.reload());
     brand.addEventListener('click', (event) => event.stopPropagation());
     document.body.appendChild(brand);
   }
@@ -3398,6 +3406,7 @@ function renderFamilyCards(speciesList = []) {
   let overviewReturnFocus = null;
   let overviewMenuOpen = false;
   let timelineLayoutFrame = 0;
+  let timelineTappedColumnKey = null;
   let timelineHover = null;
   let timelineHoverButton = null;
   let timelineHoverAvatar = null;
@@ -3428,6 +3437,12 @@ function renderFamilyCards(speciesList = []) {
       : entry ? entry.type === 'species' ? [entry.item] : entry.species || [] : []);
     overviewContent.querySelectorAll('.tl-marker').forEach(button => {
       button.classList.toggle('is-search-match', records.has(ALL[Number(button.dataset.timelineKey)]));
+    });
+    overviewContent.querySelectorAll('.tl-column.is-hoverable').forEach(column => {
+      const selected = activeView === 'cards' && (panelOpen
+        ? !!column.querySelector('.tl-marker.is-search-match')
+        : column.dataset.columnKey === timelineTappedColumnKey);
+      column.classList.toggle('is-column-selected', selected);
     });
   }
 
@@ -3576,6 +3591,8 @@ function renderFamilyCards(speciesList = []) {
           const columnItems = items.slice(index * itemsPerColumn, (index + 1) * itemsPerColumn);
           if (group.key) {
             column.classList.add('is-hoverable');
+            column.dataset.columnKey = `${group.key}:${year}:${index}`;
+            column.addEventListener('pointerenter', () => column.classList.remove('is-focus-restored'));
             const countLabel = document.createElement('span'); countLabel.className = 'tl-column-count';
             countLabel.setAttribute('aria-hidden', 'true'); countLabel.textContent = String(columnItems.length);
             column.appendChild(countLabel);
@@ -3706,6 +3723,22 @@ function renderFamilyCards(speciesList = []) {
   overview.addEventListener('keydown', event => {
     if (event.key === 'Escape' && overviewMenuOpen) { event.preventDefault(); event.stopImmediatePropagation(); setOverviewMenu(false); overviewSortButton.focus(); }
   }, true);
+  timelineScroller.addEventListener('focusin', event => event.target.closest('.tl-column')?.classList.remove('is-focus-restored'));
+  timelineScroller.addEventListener('click', event => {
+    if (event.target.closest('.tl-marker, .tl-info')) return;
+    if (timelineHoverMedia.matches && innerWidth > 860 && event.pointerType !== 'touch') return;
+    const column = event.target.closest('.tl-column.is-hoverable');
+    if (!column) return;
+    timelineTappedColumnKey = column.dataset.columnKey;
+    refreshTimelineSearchHighlights();
+  });
+  // Capture also sees clicks stopped by the overview, header, or search.
+  document.addEventListener('click', event => {
+    if (!timelineTappedColumnKey) return;
+    if (event.target.closest?.('.tl-column.is-hoverable')?.dataset.columnKey === timelineTappedColumnKey) return;
+    timelineTappedColumnKey = null;
+    refreshTimelineSearchHighlights();
+  }, true);
   timelineScroller.addEventListener('scroll', hideTimelineTooltip, { passive: true });
   timelineScroller.addEventListener('wheel', event => {
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY) || !event.deltaY) return;
@@ -3771,7 +3804,6 @@ function renderFamilyCards(speciesList = []) {
   const searchResults = searchRoot.querySelector('.gs-results');
   const searchStatus = searchRoot.querySelector('[role="status"]');
   const searchLaunch = searchRoot.querySelector('.gs-launch');
-  const searchMedia = matchMedia('(max-width: 860px)');
   const searchNormalize = (value) => (value || '').toString().normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/ß/g, 'ss')
     .replace(/[ʻ’']/g, '').trim();
@@ -4028,7 +4060,7 @@ function renderFamilyCards(speciesList = []) {
   searchLaunch.addEventListener('click', () => setSearchOpen(true, true));
   searchRoot.querySelector('.gs-close').addEventListener('click', () => {
     setSearchOpen(false);
-    if (searchMedia.matches) searchLaunch.focus();
+    if (headerIsMobile()) searchLaunch.focus();
   });
   searchInput.addEventListener('focus', () => setSearchOpen(true));
   searchInput.addEventListener('input', () => { setSearchOpen(true); });
@@ -4039,7 +4071,7 @@ function renderFamilyCards(speciesList = []) {
       event.preventDefault(); cards[Math.min(index + 1, cards.length - 1)].focus();
     } else if (event.key === 'ArrowUp' && cards.length) {
       event.preventDefault(); (index <= 0 ? searchInput : cards[index - 1]).focus();
-    } else if (event.key === 'Tab' && searchMedia.matches && searchRoot.classList.contains('is-open')) {
+    } else if (event.key === 'Tab' && headerIsMobile() && searchRoot.classList.contains('is-open')) {
       const controls = [searchInput, searchRoot.querySelector('.gs-close'), ...cards];
       if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls[controls.length - 1].focus(); }
       else if (!event.shiftKey && document.activeElement === controls[controls.length - 1]) { event.preventDefault(); controls[0].focus(); }
@@ -4048,15 +4080,74 @@ function renderFamilyCards(speciesList = []) {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && searchRoot.classList.contains('is-open')) {
       event.preventDefault(); event.stopImmediatePropagation(); setSearchOpen(false);
-      if (searchMedia.matches) searchLaunch.focus();
+      if (headerIsMobile()) searchLaunch.focus();
     }
   }, true);
   document.addEventListener('pointerdown', (event) => {
-    if (!searchMedia.matches && !searchRoot.contains(event.target)) setSearchOpen(false);
+    if (!headerIsMobile() && !searchRoot.contains(event.target)) setSearchOpen(false);
   });
   // Search events must not reach the globe / existing panel overlay.
   searchRoot.addEventListener('click', (event) => event.stopPropagation());
-  searchMedia.addEventListener('change', () => setSearchOpen(false));
+  // The header keeps one desktop row, shrinking search before switching modes.
+  function computeHeaderLayout(width, fullTextWidth, shortTextWidth, insets = { left: 18, right: 12 }) {
+    const tabsWidth = 146, gap = 16, brandWidth = 406.717 + 8 + 42;
+    const tabsLeft = Math.max(width / 2 - tabsWidth / 2, insets.left + brandWidth + gap);
+    const available = width - insets.right - tabsLeft - tabsWidth - gap;
+    const searchWidth = Math.min(409, available);
+    const mobile = searchWidth < shortTextWidth + 48 + 4;
+    if (mobile) {
+      const logoWidth = Math.max(55, Math.min(96, width - 265));
+      const left = Math.max(8, insets.left - 10);
+      const right = Math.max(13, insets.right + 1);
+      const minCenter = left + logoWidth + 8 + 42 + 8 + tabsWidth / 2;
+      const maxCenter = width - right - 32 - 8 - tabsWidth / 2;
+      return { mobile, searchWidth: 0, short: false, logoWidth,
+        tabsCenter: Math.min(maxCenter, Math.max(width / 2, minCenter)) };
+    }
+    return { mobile, searchWidth, short: searchWidth - 48 < fullTextWidth + 4,
+      logoWidth: 0, tabsCenter: tabsLeft + tabsWidth / 2 };
+  }
+
+  const headerTextMeasure = document.createElement('span');
+  headerTextMeasure.className = 'globe-header-measure';
+  headerTextMeasure.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(headerTextMeasure);
+  const fullSearchPlaceholder = 'Suche nach Art, Gattung oder Familie';
+  const shortSearchPlaceholder = 'Suchen nach…';
+  const headerIsMobile = () => document.body.classList.contains('globe-header-mobile');
+
+  function updateResponsiveHeader() {
+    // Always measure the desktop input font, even while compact search is open.
+    headerTextMeasure.style.font = '400 14px/24px "Rubik Variablefont Wght", sans-serif';
+    headerTextMeasure.textContent = fullSearchPlaceholder;
+    const fullWidth = headerTextMeasure.getBoundingClientRect().width;
+    headerTextMeasure.textContent = shortSearchPlaceholder;
+    const shortWidth = headerTextMeasure.getBoundingClientRect().width;
+    const rootStyle = getComputedStyle(document.documentElement);
+    const safeLeft = parseFloat(rootStyle.getPropertyValue('--header-safe-left')) || 0;
+    const safeRight = parseFloat(rootStyle.getPropertyValue('--header-safe-right')) || 0;
+    const layout = computeHeaderLayout(document.documentElement.clientWidth || innerWidth, fullWidth, shortWidth,
+      { left: 18 + safeLeft, right: 12 + safeRight });
+    const changed = headerIsMobile() !== layout.mobile;
+    if (changed && searchRoot.classList.contains('is-open')) setSearchOpen(false);
+    document.body.classList.toggle('globe-header-mobile', layout.mobile);
+    document.body.style.setProperty('--header-tabs-center', `${layout.tabsCenter}px`);
+    document.body.style.setProperty('--header-search-width', `${Math.max(0, layout.searchWidth)}px`);
+    document.body.style.setProperty('--header-mobile-logo-width', `${layout.logoWidth}px`);
+    searchInput.placeholder = !layout.mobile && layout.short ? shortSearchPlaceholder : fullSearchPlaceholder;
+    updatePanelTheme();
+  }
+  let headerLayoutFrame = 0;
+  function scheduleResponsiveHeader() {
+    if (headerLayoutFrame) return;
+    headerLayoutFrame = requestAnimationFrame(() => { headerLayoutFrame = 0; updateResponsiveHeader(); });
+  }
+  addEventListener('resize', scheduleResponsiveHeader);
+  window.visualViewport?.addEventListener('resize', scheduleResponsiveHeader);
+  document.fonts?.ready.then(scheduleResponsiveHeader);
+  document.fonts?.addEventListener?.('loadingdone', scheduleResponsiveHeader);
+  updateResponsiveHeader();
+
 
   // =========================================================
   // START
