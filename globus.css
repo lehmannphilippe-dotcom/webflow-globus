@@ -1543,6 +1543,11 @@ body { min-height: 100vh; min-height: 100dvh; }
 /* Word grouping is dynamic; Webflow retains title font sizes and spacing. */
 .globe-title-words { display: block; min-width: 0; max-width: 100%; }
 .globe-title-words > span { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: normal; word-break: normal; }
+/* Keep compound parts whole; existing hyphens are the first wrapping choice. */
+.globe-title-words > .globe-title-compound,
+.globe-title-words .globe-title-part { -webkit-hyphens: none; hyphens: none; overflow-wrap: normal; word-break: normal; }
+.globe-title-words .globe-title-part.is-title-part-long { -webkit-hyphens: auto; hyphens: auto; overflow-wrap: anywhere; }
+
 #genus-panel.globe-no-extinction-date #genus-name-de { margin-bottom: 24px; }
 
 /* One clipping edge only: avoid doubled corner antialiasing and image seams. */
