@@ -3281,7 +3281,7 @@ function renderFamilyCards(speciesList = []) {
     const brand = document.createElement('div');
     brand.id = 'globe-brand';
     brand.innerHTML = `
-      <button type="button" class="gb-logo" aria-label="The Silent Globe – Intro neu starten"><span class="gb-mobile-name">THE SILENT<br>GLOBE</span></button>
+      <button type="button" class="gb-logo" aria-label="The Silent Globe – Intro neu starten"></button>
       <button type="button" class="gb-info" aria-label="Informationen zu The Silent Globe">
         <span class="gb-info-default" aria-hidden="true"></span>
         <span class="gb-info-hover" aria-hidden="true"></span>
@@ -4096,16 +4096,15 @@ function renderFamilyCards(speciesList = []) {
     const searchWidth = Math.min(409, available);
     const mobile = searchWidth < shortTextWidth + 48 + 4;
     if (mobile) {
-      const logoWidth = Math.max(55, Math.min(96, width - 265));
       const left = Math.max(8, insets.left - 10);
       const right = Math.max(13, insets.right + 1);
-      const minCenter = left + logoWidth + 8 + 42 + 8 + tabsWidth / 2;
+      const minCenter = left + 42 + 8 + tabsWidth / 2;
       const maxCenter = width - right - 32 - 8 - tabsWidth / 2;
-      return { mobile, searchWidth: 0, short: false, logoWidth,
+      return { mobile, searchWidth: 0, short: false,
         tabsCenter: Math.min(maxCenter, Math.max(width / 2, minCenter)) };
     }
     return { mobile, searchWidth, short: searchWidth - 48 < fullTextWidth + 4,
-      logoWidth: 0, tabsCenter: tabsLeft + tabsWidth / 2 };
+      tabsCenter: tabsLeft + tabsWidth / 2 };
   }
 
   const headerTextMeasure = document.createElement('span');
@@ -4133,7 +4132,6 @@ function renderFamilyCards(speciesList = []) {
     document.body.classList.toggle('globe-header-mobile', layout.mobile);
     document.body.style.setProperty('--header-tabs-center', `${layout.tabsCenter}px`);
     document.body.style.setProperty('--header-search-width', `${Math.max(0, layout.searchWidth)}px`);
-    document.body.style.setProperty('--header-mobile-logo-width', `${layout.logoWidth}px`);
     searchInput.placeholder = !layout.mobile && layout.short ? shortSearchPlaceholder : fullSearchPlaceholder;
     updatePanelTheme();
   }
