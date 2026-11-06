@@ -443,7 +443,28 @@
       title.replaceChildren(wrapper);
       const widths = words.map(word => word.getBoundingClientRect().width);
       words.forEach((word, index) => {
-        if (widths[index] > width + 1 / 64) word.style.whiteSpace = 'normal';
+        if (widths[index] <= width + 1 / 64) return;
+        word.style.whiteSpace = 'normal';
+        // Prefer existing hyphens. Only an oversized component may split internally.
+        const parts = word.textContent.match(/[^\-\u2010]+[\-\u2010]?|[\-\u2010]+/gu) || [];
+        if (parts.length < 2) return;
+        word.classList.add('globe-title-compound');
+        word.replaceChildren();
+        const components = parts.map((text, partIndex) => {
+          const component = document.createElement('span');
+          component.className = 'globe-title-part';
+          component.textContent = text;
+          component.style.whiteSpace = 'nowrap';
+          word.appendChild(component);
+          if (partIndex < parts.length - 1) word.appendChild(document.createElement('wbr'));
+          return component;
+        });
+        const componentWidths = components.map(component => component.getBoundingClientRect().width);
+        components.forEach((component, partIndex) => {
+          if (componentWidths[partIndex] <= width + 1 / 64) return;
+          component.style.whiteSpace = 'normal';
+          component.classList.add('is-title-part-long');
+        });
       });
       groups.set(title, { signature: [width, title.textContent, style.font, style.letterSpacing].join('|'), wrapper });
     }
