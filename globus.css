@@ -1670,11 +1670,11 @@ body.panel-open #species-browser { pointer-events: none; }
 #species-browser .tl-columns { display: flex; height: 100%; flex: 1 1 auto; min-height: 0; background-color: #1d214a; }
 #species-browser .tl-column { position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--tl-marker-gap); width: 46px; flex: 0 0 auto; height: 100%; padding: 28px 8px 8px; box-sizing: border-box; background: #1d214a; transition: background-color 160ms ease-out; }
 #species-browser .tl-column-count { position: absolute; top: 4px; left: 4px; right: 4px; text-align: left; color: #fff; font: 400 14px/14px "Rubik Variablefont Wght", sans-serif; opacity: 0; pointer-events: none; }
-#species-browser .tl-column.is-hoverable:focus-within:not(.is-focus-restored) { background-color: #3f4c80; }
-#species-browser .tl-column.is-hoverable:focus-within:not(.is-focus-restored) .tl-column-count { opacity: 1; }
+#species-browser:not(.is-islands-view) .tl-column.is-hoverable:focus-within:not(.is-focus-restored) { background-color: #3f4c80; }
+#species-browser:not(.is-islands-view) .tl-column.is-hoverable:focus-within:not(.is-focus-restored) .tl-column-count { opacity: 1; }
 @media (hover: hover) {
-  #species-browser .tl-column.is-hoverable:hover { background-color: #3f4c80; }
-  #species-browser .tl-column.is-hoverable:hover .tl-column-count { opacity: 1; }
+  #species-browser:not(.is-islands-view) .tl-column.is-hoverable:hover { background-color: #3f4c80; }
+  #species-browser:not(.is-islands-view) .tl-column.is-hoverable:hover .tl-column-count { opacity: 1; }
 }
 #species-browser .tl-column.is-hoverable.is-column-selected { background-color: #3f4c80; }
 #species-browser .tl-column.is-hoverable.is-column-selected .tl-column-count { opacity: 1; }
@@ -1813,7 +1813,8 @@ body.panel-open #species-browser { pointer-events: none; }
 #species-browser .tl-island-year-labels { display: flex; gap: 3px; }
 #species-browser .tl-island-year-labels .tl-decade-label { flex: 0 0 46px; }
 #species-browser .tl-island-corner { position: sticky; left: 0; z-index: 7; background: #04052a; }
-#species-browser .tl-island-row { box-sizing: border-box; border-bottom: 1px solid #7da1da; }
+#species-browser .tl-island-row { position: relative; box-sizing: border-box; padding-bottom: 7px; background: #04052a; }
+#species-browser .tl-island-row::after { content: ""; position: absolute; bottom: 3px; left: 0; right: 0; height: 1px; background: #fff; pointer-events: none; }
 #species-browser .tl-island-cell { min-width: 0; box-sizing: border-box; }
 #species-browser .tl-island-label { position: sticky; left: 0; z-index: 4; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px 0; background: #04052a; }
 #species-browser .tl-island-label h3 { margin: 0; color: #fff; font: 500 16px/16px "Rubik Variablefont Wght", sans-serif; }
@@ -1827,3 +1828,16 @@ body.panel-open #species-browser { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   #species-browser .gbv-island-switch, #species-browser .gbv-island-knob { transition: none; }
 }
+
+/* Shared decade highlighting and one unique-species count above the island blocks. */
+#species-browser.is-islands-view .tl-column-count { display: none; }
+#species-browser.is-islands-view .tl-column.is-decade-active { background-color: #3f4c80; }
+#species-browser .tl-island-decade-heading { position: relative; }
+#species-browser .tl-island-shared-count {
+  position: absolute; top: 100%; left: 0; width: 46px; min-height: 24px;
+  box-sizing: border-box; padding: 4px; margin: 0;
+  color: #fff; background: #3f4c80; font: 400 14px/14px "Rubik Variablefont Wght", sans-serif;
+  text-align: left; opacity: 0; pointer-events: none;
+}
+#species-browser .tl-island-decade-heading.is-decade-active .tl-island-shared-count { opacity: 1; }
+#species-browser .gbv-timeline.is-switching { pointer-events: none; }
