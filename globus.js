@@ -3423,6 +3423,146 @@ function renderFamilyCards(speciesList = []) {
     return [...groups.values()];
   }
 
+  const timelineIslands = [
+    ['hawaii', 'Hawaii (Big Island)'], ['maui', 'Maui'], ['molokai', 'Molokai'],
+    ['lanai', 'Lanai'], ['oahu', 'Oahu'], ['laysan', 'Laysan'], ['kauai', 'Kauai']
+  ];
+
+  function timelineIslandKeys(item) {
+    const habitat = timelineNormalize(item.habitat).trim();
+    if (!timelineIsHawaii(item) || habitat === 'hawaii') return [];
+    // Parentheses name the archipelago, not another occurrence on Big Island.
+    const localities = habitat.replace(/\([^)]*\)/g, '').split(/[,;/&]|\bund\b|\band\b/)
+      .map(value => value.trim()).filter(Boolean);
+    const keys = new Set(localities);
+    if (/\bbig island\b/.test(habitat)) keys.add('hawaii');
+    return timelineIslands.filter(([key]) => keys.has(key)).map(([key]) => key);
+  }
+
+  function timelineIslandModel(height) {
+    const datedGroups = timelineGroups(ALL, 'hawaii');
+    const dated = datedGroups.flatMap(group => group.items);
+    const membership = new Map(dated.map(item => [item, timelineIslandKeys(item)]));
+    const allocated = dated.filter(item => membership.get(item).length);
+    const groups = datedGroups.length ? datedGroups : [
+      { key: 0, label: 'vor 1800', items: [], decades: new Map([[0, []]]) }
+    ];
+    const rows = timelineIslands.map(([key, label]) => {
+      const items = allocated.filter(item => membership.get(item).includes(key));
+      return { key, label, items, records: new Set(items) };
+    });
+    const earlyMax = Math.max(0, ...rows.map(row => row.items.filter(item => timelineYear(item) < 1800).length));
+    const targetHeight = Math.max(126, Math.min(252, (height - 76) / 3));
+    const targetRows = Math.max(1, Math.floor((targetHeight - 36 + 12) / 42));
+    const earlyColumns = Math.max(1, Math.ceil(earlyMax / targetRows));
+    const widths = groups.map(group => group.key
+      ? group.decades.size * 46 + (group.decades.size - 1) * 3 + 10
+      : Math.max(152, earlyColumns * 46) + 10);
+    const lastGroup = groups.at(-1), lastYear = [...lastGroup.decades.keys()].at(-1);
+    for (const row of rows) {
+      let needed = 80;
+      for (const group of groups) for (const [year, items] of group.decades) {
+        const count = items.filter(item => row.records.has(item)).length;
+        const stack = group.key ? count : Math.ceil(count / earlyColumns);
+        const infoSpace = group === lastGroup && year === lastYear ? 38 : 0;
+        needed = Math.max(needed, 36 + infoSpace + stack * 30 + Math.max(0, stack - 1) * 12);
+      }
+      row.height = needed + 1;
+      row.rowsPerColumn = Math.max(1, Math.floor((needed - 36 - (lastGroup.key === 0 ? 38 : 0) + 12) / 42));
+    }
+    return { groups, allocated, rows, earlyColumns, widths };
+  }
+
+  function makeTimelineInfo(label = '') {
+    const info = document.createElement('button'); info.type = 'button'; info.className = 'tl-info';
+    info.setAttribute('aria-label', label ? `Informationen zu ${label}` : 'Informationen zur Zeitliste');
+    info.setAttribute('aria-disabled', 'true');
+    const icon = document.createElement('span'); icon.setAttribute('aria-hidden', 'true'); info.appendChild(icon);
+    // Information panels will be added later.
+    info.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); });
+    return info;
+  }
+
+  function timelineOccurrence(button) {
+    return button?.dataset.timelineKey === undefined ? null
+      : `${button.dataset.island || ''}:${button.dataset.timelineKey}`;
+  }
+
+  function renderIslandTimeline() {
+    const model = timelineIslandModel(timelineScroller.clientHeight);
+    overview.style.setProperty('--tl-marker-size', '30px');
+    overview.style.setProperty('--tl-marker-gap', '12px');
+    const matrix = document.createElement('div'); matrix.className = 'tl-island-matrix';
+    matrix.style.setProperty('--island-grid-columns', `160px ${model.widths.map(width => `${width}px`).join(' ')}`);
+    const header = document.createElement('div'); header.className = 'tl-island-header';
+    const corner = document.createElement('div'); corner.className = 'tl-island-corner'; header.appendChild(corner);
+    for (const group of model.groups) {
+      const cell = document.createElement('div'); cell.className = 'tl-group';
+      const heading = document.createElement('h2'); heading.className = 'tl-heading';
+      const title = document.createElement('span');
+      if (!group.key) {
+        const prefix = document.createElement('span'); prefix.className = 'tl-before-prefix'; prefix.textContent = 'vor';
+        title.append(prefix, document.createTextNode(' 1800'));
+      } else title.textContent = group.label;
+      const count = document.createElement('span'); count.className = 'tl-count';
+      const total = group.items.filter(item => model.allocated.includes(item)).length;
+      count.textContent = `${total} ${total === 1 ? 'Art/Form' : 'Arten/Formen'}`;
+      heading.append(title, count);cell.appendChild(heading);
+      const labels = document.createElement('div'); labels.className = 'tl-island-year-labels';
+      for (const year of group.decades.keys()) {
+        const label = document.createElement('h3'); label.className = 'tl-decade-label';
+        label.textContent = year ? String(year) : ''; labels.appendChild(label);
+      }
+      cell.appendChild(labels);header.appendChild(cell);
+    }
+    matrix.appendChild(header);
+    for (const row of model.rows) {
+      const section = document.createElement('section'); section.className = 'tl-island-row';
+      section.dataset.island = row.key;section.style.height = `${row.height}px`;
+      const label = document.createElement('div');label.className = 'tl-island-label';
+      const title = document.createElement('h3');title.id = `tl-island-${row.key}`;title.textContent = row.label;
+      section.setAttribute('aria-labelledby', title.id);
+      const count = document.createElement('span');count.textContent = `${row.items.length} ${row.items.length === 1 ? 'Art/Form' : 'Arten/Formen'}`;
+      label.append(title, count);section.appendChild(label);
+      for (const group of model.groups) {
+        const cell = document.createElement('div');cell.className = 'tl-group tl-island-cell';
+        cell.dataset.century = String(group.key);cell.classList.toggle('is-before-1800', !group.key);
+        const decades = document.createElement('div');decades.className = 'tl-decades';
+        for (const [year, sourceItems] of group.decades) {
+          const items = sourceItems.filter(item => row.records.has(item));
+          const decade = document.createElement('div');decade.className = 'tl-decade';decade.dataset.year = String(year);
+          decade.classList.toggle('is-empty', !items.length);
+          const columns = document.createElement('div');columns.className = 'tl-columns';
+          const perColumn = group.key ? items.length : row.rowsPerColumn;
+          const columnCount = group.key ? 1 : model.earlyColumns;
+          for (let index = 0; index < columnCount; index++) {
+            const column = document.createElement('div');column.className = 'tl-column';
+            const columnItems = items.slice(index * perColumn, (index + 1) * perColumn);
+            if (group.key) {
+              column.classList.add('is-hoverable');column.dataset.columnKey = `${row.key}:${group.key}:${year}:${index}`;
+              column.addEventListener('pointerenter', () => column.classList.remove('is-focus-restored'));
+              const amount = document.createElement('span');amount.className = 'tl-column-count';amount.setAttribute('aria-hidden', 'true');
+              amount.textContent = String(columnItems.length);column.appendChild(amount);
+            }
+            for (const item of columnItems) {
+              const button = makeTimelineMarker(item);button.dataset.island = row.key;
+              button.setAttribute('aria-label', `${timelineName(item)}, ${timelineYear(item)}, ${row.label} – Art öffnen`);
+              column.appendChild(button);
+            }
+            columns.appendChild(column);
+          }
+          decade.appendChild(columns);decades.appendChild(decade);
+        }
+        cell.appendChild(decades);section.appendChild(cell);
+      }
+      const lastColumn = section.querySelector('.tl-island-cell:last-child .tl-decade:last-child .tl-column:last-child');
+      if (lastColumn) { lastColumn.classList.add('has-timeline-info');lastColumn.appendChild(makeTimelineInfo(row.label)); }
+      matrix.appendChild(section);
+    }
+    overviewContent.replaceChildren(matrix);
+    return model;
+  }
+
   function timelinePointLayout(height, groups) {
     // Reserve space for the column count, plus the existing title and labels.
     const available = Math.max(0, height - 120);
@@ -3456,6 +3596,12 @@ function renderFamilyCards(speciesList = []) {
       <div class="gbv-select">
         <button type="button" id="gbv-sort" class="gbv-sort" aria-haspopup="listbox" aria-expanded="false" aria-controls="gbv-options" aria-labelledby="gbv-sort-caption gbv-sort-value"><span id="gbv-sort-value">Hawaii</span><span class="gbv-chevron" aria-hidden="true"></span></button>
       </div>
+      <div class="gbv-island-control">
+        <button type="button" id="gbv-island-switch" class="gbv-island-switch" role="switch" aria-checked="false" aria-labelledby="gbv-island-caption">
+          <span class="gbv-island-knob" aria-hidden="true"><img class="gbv-island-off" src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiB2aWV3Qm94PSIwIDAgMzggMzgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJHcm91cCAzNSI+CjxjaXJjbGUgaWQ9IkVsbGlwc2UgODEiIGN4PSIxOSIgY3k9IjE5IiByPSIxOSIgZmlsbD0iIzNGNEM4MCIvPgo8ZyBpZD0iY2hlY2tfc21hbGxfMjRkcF9FM0UzRTNfRklMTDBfd2dodDQwMF9HUkFEMF9vcHN6MjQgMSI+CjxnIGlkPSJWZWN0b3IiPgo8L2c+CjwvZz4KPC9nPgo8L3N2Zz4K" alt=""><img class="gbv-island-on" src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiB2aWV3Qm94PSIwIDAgMzggMzgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJHcm91cCAzNSI+CjxjaXJjbGUgaWQ9IkVsbGlwc2UgODEiIGN4PSIxOSIgY3k9IjE5IiByPSIxOSIgZmlsbD0iIzNGNEM4MCIvPgo8ZyBpZD0iY2hlY2tfc21hbGxfMjRkcF9FM0UzRTNfRklMTDBfd2dodDQwMF9HUkFEMF9vcHN6MjQgMSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik0xNi4zMzMzIDI1TDExIDE5LjQ2ODFMMTIuODY2NyAxNy41MzE5TDE2LjMzMzMgMjEuMTI3N0wyNS4xMzMzIDEyTDI3IDEzLjkzNjJMMTYuMzMzMyAyNVoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L2c+Cjwvc3ZnPgo=" alt=""></span>
+        </button>
+        <label id="gbv-island-caption" class="gbv-caption" for="gbv-island-switch">nach Insel</label>
+      </div>
     </div>
     <div class="gbv-timeline" tabindex="0" role="region" aria-label="Aussterbejahre, horizontal scrollbar"><div class="gbv-content"></div></div>
     <div id="gbv-options" class="gbv-options" role="listbox" aria-label="Region" hidden>
@@ -3467,10 +3613,14 @@ function renderFamilyCards(speciesList = []) {
   const overviewStatus = overview.querySelector('.gbv-status');
   const timelineScroller = overview.querySelector('.gbv-timeline');
   const overviewSortButton = overview.querySelector('.gbv-sort');
+  const overviewIslandSwitch = overview.querySelector('#gbv-island-switch');
+  const overviewIslandControl = overview.querySelector('.gbv-island-control');
   const overviewOptions = overview.querySelector('.gbv-options');
   const overviewOptionButtons = [...overviewOptions.querySelectorAll('[data-region]')];
   const overviewReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   let overviewRegion = 'hawaii';
+  let overviewIslands = false;
+  const islandTimelineActive = () => overviewRegion === 'hawaii' && overviewIslands;
   let overviewDataReady = false;
   let overviewRenderedRegion = null;
   let overviewSwitchToken = 0;
@@ -3535,6 +3685,7 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function hideTimelineTooltip() {
+    overviewContent.querySelectorAll('.tl-marker.is-peer-hovered').forEach(button => button.classList.remove('is-peer-hovered'));
     timelineHoverButton?.classList.remove('is-hovered');
     timelineHoverButton?.removeAttribute('aria-describedby');
     timelineHoverButton = null;
@@ -3595,6 +3746,9 @@ function renderFamilyCards(speciesList = []) {
     timelineHoverSurface.style.setProperty('flex-direction', flipped ? 'row-reverse' : 'row', 'important');
     timelineHover.style.left = `${U.clamp(left, leftEdge, Math.max(leftEdge, rightEdge - width))}px`;
     timelineHover.style.top = `${U.clamp(rect.top + rect.height / 2 - height / 2, topEdge, Math.max(topEdge, bottomEdge - height))}px`;
+    overviewContent.querySelectorAll('.tl-marker').forEach(peer => {
+      if (peer.dataset.timelineKey === button.dataset.timelineKey) peer.classList.add('is-peer-hovered');
+    });
     button.classList.add('is-hovered');
     button.setAttribute('aria-describedby', 'timeline-hover');
   }
@@ -3624,12 +3778,44 @@ function renderFamilyCards(speciesList = []) {
     return button;
   }
 
+  function updateIslandControl() {
+    const available = overviewRegion === 'hawaii';
+    overviewIslandControl.hidden = !available;
+    overviewIslandSwitch.setAttribute('aria-checked', String(islandTimelineActive()));
+    overview.classList.toggle('has-island-control', available);
+    overview.classList.toggle('is-islands-view', islandTimelineActive());
+    timelineScroller.setAttribute('aria-label', islandTimelineActive()
+      ? 'Aussterbejahre nach Insel, horizontal und vertikal scrollbar' : 'Aussterbejahre, horizontal scrollbar');
+  }
+
+  function finishTimelineRender(groups, status, focusedId, returnId, savedScroll, savedTop, resetScroll) {
+    refreshTimelineSearchHighlights();
+    overviewRenderedRegion = overviewRegion + (islandTimelineActive() ? ':islands' : '');
+    overviewStatus.textContent = status;
+    overviewStatus.classList.toggle('is-sr-only', groups.length > 0);
+    overviewContent.setAttribute('aria-busy', 'false');
+    timelineScroller.scrollLeft = resetScroll ? 0 : savedScroll;
+    timelineScroller.scrollTop = resetScroll ? 0 : savedTop;
+    const markers = [...overviewContent.querySelectorAll('.tl-marker')];
+    if (focusedId) markers.find(button => timelineOccurrence(button) === focusedId)?.focus({ preventScroll: true });
+    if (returnId) overviewReturnFocus = markers.find(button => timelineOccurrence(button) === returnId) || null;
+  }
+
   function renderOverview(animate = true, resetScroll = true) {
     if (!overviewDataReady || activeView !== 'cards') return;
-    const focusedId = overviewContent.contains(document.activeElement) ? document.activeElement.dataset.timelineKey : null;
-    const savedScroll = timelineScroller.scrollLeft;
+    const focusedId = overviewContent.contains(document.activeElement) ? timelineOccurrence(document.activeElement) : null;
+    const returnId = timelineOccurrence(overviewReturnFocus);
+    const savedScroll = timelineScroller.scrollLeft, savedTop = timelineScroller.scrollTop;
+    updateIslandControl();
     hideTimelineTooltip();
     overviewContent.setAttribute('aria-busy', 'true');
+    if (islandTimelineActive()) {
+      const model = renderIslandTimeline();
+      finishTimelineRender(model.groups,
+        `${model.allocated.length} Arten/Formen auf sieben Inseln. Mehrfachvorkommen sind pro Insel dargestellt; Arten ohne eindeutige Insel oder Jahresangabe sind ausgeblendet.`,
+        focusedId, returnId, savedScroll, savedTop, resetScroll);
+      return;
+    }
     const groups = timelineGroups(ALL, overviewRegion);
     // Fit the currently visible region, retaining the same 30px maximum.
     const layout = timelinePointLayout(timelineScroller.clientHeight, groups);
@@ -3677,23 +3863,13 @@ function renderFamilyCards(speciesList = []) {
     }
     const lastColumn = fragment.querySelector('.tl-group:last-child .tl-decade:last-child .tl-column:last-child');
     if (lastColumn) {
-      const info = document.createElement('button'); info.type = 'button'; info.className = 'tl-info';
-      info.setAttribute('aria-label', 'Informationen zur Zeitliste'); info.setAttribute('aria-disabled', 'true');
-      const icon = document.createElement('span'); icon.setAttribute('aria-hidden', 'true'); info.appendChild(icon);
-      // Intentionally no action until the information content is available.
-      info.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); });
-      lastColumn.classList.add('has-timeline-info'); lastColumn.appendChild(info);
+      lastColumn.classList.add('has-timeline-info');lastColumn.appendChild(makeTimelineInfo());
     }
     overviewContent.replaceChildren(fragment);
-    refreshTimelineSearchHighlights();
-    overviewRenderedRegion = overviewRegion;
-    overviewStatus.textContent = groups.length
+    const status = groups.length
       ? `${groups.reduce((sum, group) => sum + group.items.length, 0)} Arten/Formen, ${overviewRegion === 'hawaii' ? 'Hawaii' : 'alle Regionen'}, nach Aussterbejahr. Arten ohne eindeutiges Jahr sind ausgeblendet.`
       : 'Keine Arten mit eindeutigem Aussterbejahr vorhanden.';
-    overviewStatus.classList.toggle('is-sr-only', groups.length > 0);
-    overviewContent.setAttribute('aria-busy', 'false');
-    timelineScroller.scrollLeft = resetScroll ? 0 : savedScroll;
-    if (focusedId) [...overviewContent.querySelectorAll('.tl-marker')].find(button => button.dataset.timelineKey === focusedId)?.focus({ preventScroll: true });
+    finishTimelineRender(groups, status, focusedId, returnId, savedScroll, savedTop, resetScroll);
   }
 
   function scheduleTimelineLayout() {
@@ -3750,7 +3926,7 @@ function renderFamilyCards(speciesList = []) {
       DOM.globeHost.setAttribute('aria-hidden', 'true'); DOM.globeHost.setAttribute('inert', '');
       document.body.classList.add('globe-cards-view');
       overview.removeAttribute('inert'); overview.setAttribute('aria-hidden', 'false');
-      if (overviewRenderedRegion !== overviewRegion) renderOverview(false, true);
+      if (overviewRenderedRegion !== overviewRegion + (islandTimelineActive() ? ':islands' : '')) renderOverview(false, true);
       else scheduleTimelineLayout();
     } else {
       activeView = 'globe'; updateOverviewTabs(next);
@@ -3767,6 +3943,12 @@ function renderFamilyCards(speciesList = []) {
   document.querySelector('#globe-view-switch .gv-grid')?.setAttribute('aria-label', 'Zeitliste nach Aussterbejahr');
   document.querySelector('#globe-view-switch .gv-grid')?.addEventListener('click', () => setOverviewView('cards'));
   document.querySelector('#globe-view-switch .gv-globe')?.addEventListener('click', () => setOverviewView('globe'));
+  overviewIslandSwitch.addEventListener('click', () => {
+    if (overviewRegion !== 'hawaii') return;
+    overviewIslands = !overviewIslands;timelineTappedColumnKey = null;
+    setOverviewMenu(false);renderOverview(false, true);
+  });
+  updateIslandControl();
   overviewSortButton.addEventListener('click', () => setOverviewMenu(!overviewMenuOpen));
   overviewSortButton.addEventListener('keydown', event => {
     if (['ArrowDown', 'ArrowUp'].includes(event.key)) { event.preventDefault(); setOverviewMenu(true, true); }
@@ -3776,6 +3958,9 @@ function renderFamilyCards(speciesList = []) {
     if (!option) return;
     const changed = overviewRegion !== option.dataset.region;
     overviewRegion = option.dataset.region;
+    if (overviewRegion !== 'hawaii') overviewIslands = false;
+    if (changed) timelineTappedColumnKey = null;
+    updateIslandControl();
     overview.querySelector('#gbv-sort-value').textContent = option.textContent;
     overviewOptionButtons.forEach(button => button.setAttribute('aria-selected', String(button === option)));
     setOverviewMenu(false); overviewSortButton.focus();
@@ -3812,6 +3997,7 @@ function renderFamilyCards(speciesList = []) {
   }, true);
   timelineScroller.addEventListener('scroll', hideTimelineTooltip, { passive: true });
   timelineScroller.addEventListener('wheel', event => {
+    if (islandTimelineActive() && !event.shiftKey) return;
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY) || !event.deltaY) return;
     const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? timelineScroller.clientWidth : 1);
     const before = timelineScroller.scrollLeft;
@@ -3823,16 +4009,18 @@ function renderFamilyCards(speciesList = []) {
   let timelineSuppressClickUntil = 0;
   timelineScroller.addEventListener('pointerdown', event => {
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    timelineDrag = { id: event.pointerId, x: event.clientX, left: timelineScroller.scrollLeft, moved: false };
+    timelineDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, left: timelineScroller.scrollLeft, top: timelineScroller.scrollTop, moved: false };
   });
   timelineScroller.addEventListener('pointermove', event => {
     if (!timelineDrag || timelineDrag.id !== event.pointerId || !(event.buttons & 1)) return;
     const delta = event.clientX - timelineDrag.x;
-    if (!timelineDrag.moved && Math.abs(delta) < 5) return;
+    const deltaY = islandTimelineActive() ? event.clientY - timelineDrag.y : 0;
+    if (!timelineDrag.moved && Math.hypot(delta, deltaY) < 5) return;
     timelineDrag.moved = true; hideTimelineTooltip();
     timelineScroller.setPointerCapture(event.pointerId);
     timelineScroller.classList.add('is-dragging');
     timelineScroller.scrollLeft = timelineDrag.left - delta;
+    if (islandTimelineActive()) timelineScroller.scrollTop = timelineDrag.top - deltaY;
     event.preventDefault();
   });
   const finishTimelineDrag = event => {
