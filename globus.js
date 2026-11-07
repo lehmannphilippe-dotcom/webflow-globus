@@ -2982,6 +2982,7 @@ function renderFamilyCards(speciesList = []) {
       // Restore keyboard focus without immediately reactivating its hover marker.
       hideTimelineTooltip();
       overviewReturnFocus.closest('.tl-column')?.classList.add('is-focus-restored');
+      refreshIslandDecadeHighlights();
       overviewReturnFocus = null;
     }
   }
@@ -3467,7 +3468,7 @@ function renderFamilyCards(speciesList = []) {
         const infoSpace = group === lastGroup && year === lastYear ? 38 : 0;
         needed = Math.max(needed, 36 + infoSpace + stack * 30 + Math.max(0, stack - 1) * 12);
       }
-      row.height = needed + 1;
+      row.height = needed + 7;
       row.rowsPerColumn = Math.max(1, Math.floor((needed - 36 - (lastGroup.key === 0 ? 38 : 0) + 12) / 42));
     }
     return { groups, allocated, rows, earlyColumns, widths };
@@ -3511,7 +3512,17 @@ function renderFamilyCards(speciesList = []) {
       const labels = document.createElement('div'); labels.className = 'tl-island-year-labels';
       for (const year of group.decades.keys()) {
         const label = document.createElement('h3'); label.className = 'tl-decade-label';
-        label.textContent = year ? String(year) : ''; labels.appendChild(label);
+        label.textContent = year ? String(year) : '';
+        if (group.key) {
+          label.classList.add('tl-island-decade-heading');
+          label.dataset.decadeKey = `${group.key}:${year}`;
+          const count = document.createElement('span');count.className = 'tl-island-shared-count';
+          count.setAttribute('aria-hidden', 'true');
+          // Count source species once, regardless of their number of island occurrences.
+          count.textContent = String(new Set(group.decades.get(year).filter(item => model.allocated.includes(item))).size);
+          label.appendChild(count);
+        }
+        labels.appendChild(label);
       }
       cell.appendChild(labels);header.appendChild(cell);
     }
@@ -3540,6 +3551,7 @@ function renderFamilyCards(speciesList = []) {
             const columnItems = items.slice(index * perColumn, (index + 1) * perColumn);
             if (group.key) {
               column.classList.add('is-hoverable');column.dataset.columnKey = `${row.key}:${group.key}:${year}:${index}`;
+              column.dataset.decadeKey = `${group.key}:${year}`;
               column.addEventListener('pointerenter', () => column.classList.remove('is-focus-restored'));
               const amount = document.createElement('span');amount.className = 'tl-column-count';amount.setAttribute('aria-hidden', 'true');
               amount.textContent = String(columnItems.length);column.appendChild(amount);
@@ -3628,6 +3640,10 @@ function renderFamilyCards(speciesList = []) {
   let overviewMenuOpen = false;
   let timelineLayoutFrame = 0;
   let timelineTappedColumnKey = null;
+  let timelineIslandHoverKey = null;
+  let timelineViewTransitionId = 0;
+  let overviewIslandRequested = null;
+  const timelineViewAnimations = new Set();
   let timelineHover = null;
   let timelineHoverButton = null;
   let timelineHoverAvatar = null;
@@ -3640,6 +3656,75 @@ function renderFamilyCards(speciesList = []) {
   let timelineSearchPointer = null;
   let timelineSearchFocus = null;
 
+  function refreshIslandDecadeHighlights() {
+    if (!islandTimelineActive()) return;
+    const active = new Set();
+    const panelOpen = document.body.classList.contains('panel-open');
+    const searchOpen = document.body.classList.contains('globe-search-open');
+    if (!panelOpen && !searchOpen) {
+      if (timelineIslandHoverKey) active.add(timelineIslandHoverKey);
+      const focused = overviewContent.contains(document.activeElement)
+        ? document.activeElement.closest('[data-decade-key]') : null;
+      if (focused && !focused.classList.contains('is-focus-restored')) active.add(focused.dataset.decadeKey);
+    }
+    overviewContent.querySelectorAll('.tl-column.is-column-selected[data-decade-key]').forEach(column => active.add(column.dataset.decadeKey));
+    overviewContent.querySelectorAll('[data-decade-key]').forEach(element => {
+      element.classList.toggle('is-decade-active', active.has(element.dataset.decadeKey));
+    });
+  }
+
+  function cancelTimelineViewTransition() {
+    ++timelineViewTransitionId;
+    timelineViewAnimations.forEach(animation => animation.cancel());
+    timelineViewAnimations.clear();
+    overviewIslandRequested = null;
+    timelineScroller.classList.remove('is-switching');
+  }
+
+  async function animateTimelinePhase(phase, islands) {
+    const rows = islands ? [...overviewContent.querySelectorAll('.tl-island-row')] : [overviewContent];
+    const specs = rows.map((element, index) => ({
+      element, delay: islands ? (phase === 'out' ? rows.length - index - 1 : index) * (phase === 'out' ? 8 : 12) : 0,
+      duration: phase === 'out' ? (islands ? 140 : 90) : (islands ? 220 : 180), move: islands || phase === 'in'
+    }));
+    const header = islands && overviewContent.querySelector('.tl-island-header');
+    if (header) specs.push({ element: header, delay: 0, duration: phase === 'out' ? 140 : 180, move: false });
+    await Promise.all(specs.map(async ({ element, delay, duration, move }) => {
+      const visible = { opacity: 1, transform: 'translateY(0px)' };
+      const hidden = { opacity: 0, transform: `translateY(${move ? 8 : 0}px)` };
+      const animation = element.animate(phase === 'out' ? [visible, hidden] : [hidden, visible],
+        { duration, delay, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'both' });
+      timelineViewAnimations.add(animation);
+      try { await animation.finished; } catch {} finally { timelineViewAnimations.delete(animation); }
+      // Remove filled effects before the next phase; the shared parent survives rendering.
+      animation.cancel();
+    }));
+  }
+
+  async function transitionIslandView(next) {
+    cancelTimelineViewTransition();
+    const token = timelineViewTransitionId;
+    overviewIslandRequested = next;
+    overviewIslandSwitch.setAttribute('aria-checked', String(next));
+    timelineTappedColumnKey = null;
+    timelineIslandHoverKey = null;
+    setOverviewMenu(false);hideTimelineTooltip();refreshTimelineSearchHighlights();
+    if (next === overviewIslands || overviewReducedMotion() || typeof overviewContent.animate !== 'function') {
+      overviewIslands = next;overviewIslandRequested = null;
+      renderOverview(false, true, token);
+      return;
+    }
+    timelineScroller.classList.add('is-switching');
+    await animateTimelinePhase('out', islandTimelineActive());
+    if (token !== timelineViewTransitionId) return;
+    overviewIslands = next;
+    renderOverview(false, true, token);
+    await animateTimelinePhase('in', islandTimelineActive());
+    if (token !== timelineViewTransitionId) return;
+    overviewIslandRequested = null;
+    timelineScroller.classList.remove('is-switching');
+  }
+
   function setTimelinePanelRecords(records) {
     timelinePanelRecords = activeView === 'cards' ? [...records] : null;
     if (document.getElementById('species-browser')) refreshTimelineSearchHighlights();
@@ -3650,6 +3735,7 @@ function renderFamilyCards(speciesList = []) {
     const hovered = timelineSearchPointer?.card.isConnected ? timelineSearchPointer : null;
     const focused = timelineSearchFocus?.card.isConnected ? timelineSearchFocus : null;
     const panelOpen = document.body.classList.contains('panel-open');
+    if (panelOpen || searchOpen) timelineIslandHoverKey = null;
     const entry = searchOpen && !panelOpen ? (hovered || focused)?.entry : null;
     // The opened panel owns the selection independently of search hover/focus.
     // Compare source records, not IDs: some different species share an ID.
@@ -3665,6 +3751,7 @@ function renderFamilyCards(speciesList = []) {
         : column.dataset.columnKey === timelineTappedColumnKey);
       column.classList.toggle('is-column-selected', selected);
     });
+    refreshIslandDecadeHighlights();
   }
 
   function setTimelineSearchHover(entry, card, kind, active) {
@@ -3801,8 +3888,13 @@ function renderFamilyCards(speciesList = []) {
     if (returnId) overviewReturnFocus = markers.find(button => timelineOccurrence(button) === returnId) || null;
   }
 
-  function renderOverview(animate = true, resetScroll = true) {
+  function renderOverview(animate = true, resetScroll = true, transitionToken = null) {
     if (!overviewDataReady || activeView !== 'cards') return;
+    if (transitionToken !== timelineViewTransitionId) {
+      if (overviewIslandRequested !== null && overviewRegion === 'hawaii') overviewIslands = overviewIslandRequested;
+      cancelTimelineViewTransition();
+    }
+    timelineIslandHoverKey = null;
     const focusedId = overviewContent.contains(document.activeElement) ? timelineOccurrence(document.activeElement) : null;
     const returnId = timelineOccurrence(overviewReturnFocus);
     const savedScroll = timelineScroller.scrollLeft, savedTop = timelineScroller.scrollTop;
@@ -3910,6 +4002,8 @@ function renderFamilyCards(speciesList = []) {
   async function setOverviewView(next) {
     const token = ++overviewSwitchToken;
     if (activeView === next) { updateOverviewTabs(next); return; }
+    if (overviewIslandRequested !== null) overviewIslands = overviewIslandRequested;
+    cancelTimelineViewTransition();
     setOverviewMenu(false); hideTimelineTooltip(); setSearchOpen(false);
     await closeAllPanels(true);
     if (token !== overviewSwitchToken) return;
@@ -3945,8 +4039,7 @@ function renderFamilyCards(speciesList = []) {
   document.querySelector('#globe-view-switch .gv-globe')?.addEventListener('click', () => setOverviewView('globe'));
   overviewIslandSwitch.addEventListener('click', () => {
     if (overviewRegion !== 'hawaii') return;
-    overviewIslands = !overviewIslands;timelineTappedColumnKey = null;
-    setOverviewMenu(false);renderOverview(false, true);
+    transitionIslandView(!(overviewIslandRequested ?? overviewIslands));
   });
   updateIslandControl();
   overviewSortButton.addEventListener('click', () => setOverviewMenu(!overviewMenuOpen));
@@ -3980,6 +4073,21 @@ function renderFamilyCards(speciesList = []) {
     if (event.key === 'Escape' && overviewMenuOpen) { event.preventDefault(); event.stopImmediatePropagation(); setOverviewMenu(false); overviewSortButton.focus(); }
   }, true);
   timelineScroller.addEventListener('focusin', event => event.target.closest('.tl-column')?.classList.remove('is-focus-restored'));
+  // A decade is a single interaction column across all seven island rows.
+  timelineScroller.addEventListener('pointerover', event => {
+    if (!islandTimelineActive() || event.pointerType === 'touch' || !timelineHoverMedia.matches) return;
+    timelineIslandHoverKey = event.target.closest('[data-decade-key]')?.dataset.decadeKey || null;
+    refreshIslandDecadeHighlights();
+  });
+  timelineScroller.addEventListener('pointerout', event => {
+    if (!islandTimelineActive() || event.pointerType === 'touch') return;
+    const next = event.relatedTarget instanceof Element && timelineScroller.contains(event.relatedTarget)
+      ? event.relatedTarget.closest('[data-decade-key]') : null;
+    timelineIslandHoverKey = next?.dataset.decadeKey || null;
+    refreshIslandDecadeHighlights();
+  });
+  timelineScroller.addEventListener('focusin', refreshIslandDecadeHighlights);
+  timelineScroller.addEventListener('focusout', () => queueMicrotask(refreshIslandDecadeHighlights));
   timelineScroller.addEventListener('click', event => {
     if (event.target.closest('.tl-marker, .tl-info')) return;
     if (timelineHoverMedia.matches && innerWidth > 860 && event.pointerType !== 'touch') return;
@@ -3995,7 +4103,9 @@ function renderFamilyCards(speciesList = []) {
     timelineTappedColumnKey = null;
     refreshTimelineSearchHighlights();
   }, true);
-  timelineScroller.addEventListener('scroll', hideTimelineTooltip, { passive: true });
+  timelineScroller.addEventListener('scroll', () => {
+    timelineIslandHoverKey = null;hideTimelineTooltip();refreshIslandDecadeHighlights();
+  }, { passive: true });
   timelineScroller.addEventListener('wheel', event => {
     if (islandTimelineActive() && !event.shiftKey) return;
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY) || !event.deltaY) return;
