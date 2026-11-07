@@ -438,10 +438,21 @@ body.panel-open #globe {
 }
 
 #panel-image.is-loading {
-  filter: blur(18px);
+  filter: blur(32px);
   transform: scale(1.04);
   opacity: 0.75;
 }
+
+/* Keep the old bitmap hidden behind a separate, already requested default image. */
+#panel-image.is-pending { visibility: hidden; transition: none; }
+.panel-image-wrap .panel-loading-placeholder {
+  position: absolute; inset: 0; z-index: 1;
+  display: block; width: 100%; height: 100%; object-fit: cover;
+  margin: 0; pointer-events: none; visibility: hidden;
+  filter: blur(32px); transform: scale(1.12);
+}
+.panel-image-wrap.is-panel-image-pending .panel-loading-placeholder { visibility: visible; }
+.panel-image-wrap #panel-image { position: relative; z-index: 2; }
 
 #panel-image:not(.is-loading) {
   filter: blur(0);
