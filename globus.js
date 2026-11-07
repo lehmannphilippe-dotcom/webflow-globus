@@ -3609,7 +3609,7 @@ function renderFamilyCards(speciesList = []) {
       <div class="gbv-select">
         <button type="button" id="gbv-sort" class="gbv-sort" aria-haspopup="listbox" aria-expanded="false" aria-controls="gbv-options" aria-labelledby="gbv-sort-caption gbv-sort-value"><span id="gbv-sort-value">Hawaii</span><span class="gbv-chevron" aria-hidden="true"></span></button>
       </div>
-      <div class="gbv-island-control">
+      <div class="gbv-island-control" hidden>
         <button type="button" id="gbv-island-switch" class="gbv-island-switch" role="switch" aria-checked="false" aria-labelledby="gbv-island-caption">
           <span class="gbv-island-knob" aria-hidden="true"><img class="gbv-island-off" src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiB2aWV3Qm94PSIwIDAgMzggMzgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJHcm91cCAzNSI+CjxjaXJjbGUgaWQ9IkVsbGlwc2UgODEiIGN4PSIxOSIgY3k9IjE5IiByPSIxOSIgZmlsbD0iIzNGNEM4MCIvPgo8ZyBpZD0iY2hlY2tfc21hbGxfMjRkcF9FM0UzRTNfRklMTDBfd2dodDQwMF9HUkFEMF9vcHN6MjQgMSI+CjxnIGlkPSJWZWN0b3IiPgo8L2c+CjwvZz4KPC9nPgo8L3N2Zz4K" alt=""><img class="gbv-island-on" src="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjM4IiBoZWlnaHQ9IjM4IiB2aWV3Qm94PSIwIDAgMzggMzgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGlkPSJHcm91cCAzNSI+CjxjaXJjbGUgaWQ9IkVsbGlwc2UgODEiIGN4PSIxOSIgY3k9IjE5IiByPSIxOSIgZmlsbD0iIzNGNEM4MCIvPgo8ZyBpZD0iY2hlY2tfc21hbGxfMjRkcF9FM0UzRTNfRklMTDBfd2dodDQwMF9HUkFEMF9vcHN6MjQgMSI+CjxwYXRoIGlkPSJWZWN0b3IiIGQ9Ik0xNi4zMzMzIDI1TDExIDE5LjQ2ODFMMTIuODY2NyAxNy41MzE5TDE2LjMzMzMgMjEuMTI3N0wyNS4xMzMzIDEyTDI3IDEzLjkzNjJMMTYuMzMzMyAyNVoiIGZpbGw9IiNGRjUxMDAiLz4KPC9nPgo8L2c+Cjwvc3ZnPgo=" alt=""></span>
         </button>
@@ -3632,8 +3632,10 @@ function renderFamilyCards(speciesList = []) {
   const overviewOptionButtons = [...overviewOptions.querySelectorAll('[data-region]')];
   const overviewReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   let overviewRegion = 'hawaii';
+  // Temporarily hide island splitting; retain the implementation for later activation.
+  const ISLAND_SPLIT_ENABLED = false;
   let overviewIslands = false;
-  const islandTimelineActive = () => overviewRegion === 'hawaii' && overviewIslands;
+  const islandTimelineActive = () => ISLAND_SPLIT_ENABLED && overviewRegion === 'hawaii' && overviewIslands;
   let overviewDataReady = false;
   let overviewRenderedRegion = null;
   let overviewSwitchToken = 0;
@@ -3944,7 +3946,7 @@ function renderFamilyCards(speciesList = []) {
   }
 
   function updateIslandControl() {
-    const available = overviewRegion === 'hawaii';
+    const available = ISLAND_SPLIT_ENABLED && overviewRegion === 'hawaii';
     overviewIslandControl.hidden = !available;
     overviewIslandSwitch.setAttribute('aria-checked', String(islandTimelineActive()));
     overview.classList.toggle('has-island-control', available);
@@ -4116,7 +4118,7 @@ function renderFamilyCards(speciesList = []) {
   document.querySelector('#globe-view-switch .gv-grid')?.addEventListener('click', () => setOverviewView('cards'));
   document.querySelector('#globe-view-switch .gv-globe')?.addEventListener('click', () => setOverviewView('globe'));
   overviewIslandSwitch.addEventListener('click', () => {
-    if (overviewRegion !== 'hawaii') return;
+    if (!ISLAND_SPLIT_ENABLED || overviewRegion !== 'hawaii') return;
     transitionIslandView(!(overviewIslandRequested ?? overviewIslands));
   });
   updateIslandControl();
