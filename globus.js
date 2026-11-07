@@ -1746,6 +1746,7 @@
   }
 
   function setPanelOpen(open) {
+    if (open && activeView === 'cards') cancelTimelineViewTransition();
     document.getElementById('species-browser')?.toggleAttribute('inert', open || activeView !== 'cards');
     if (open) {
       updatePanelShiftVar();
@@ -3498,7 +3499,7 @@ function renderFamilyCards(speciesList = []) {
     const header = document.createElement('div'); header.className = 'tl-island-header';
     const corner = document.createElement('div'); corner.className = 'tl-island-corner'; header.appendChild(corner);
     for (const group of model.groups) {
-      const cell = document.createElement('div'); cell.className = 'tl-group';
+      const cell = document.createElement('div'); cell.className = 'tl-group';cell.dataset.century = String(group.key);
       const heading = document.createElement('h2'); heading.className = 'tl-heading';
       const title = document.createElement('span');
       if (!group.key) {
@@ -3644,6 +3645,7 @@ function renderFamilyCards(speciesList = []) {
   let timelineViewTransitionId = 0;
   let overviewIslandRequested = null;
   const timelineViewAnimations = new Set();
+  let timelineTransitionStage = null;
   let timelineHover = null;
   let timelineHoverButton = null;
   let timelineHoverAvatar = null;
@@ -3677,28 +3679,105 @@ function renderFamilyCards(speciesList = []) {
     ++timelineViewTransitionId;
     timelineViewAnimations.forEach(animation => animation.cancel());
     timelineViewAnimations.clear();
+    timelineTransitionStage?.remove();
+    timelineTransitionStage = null;
     overviewIslandRequested = null;
     timelineScroller.classList.remove('is-switching');
   }
 
-  async function animateTimelinePhase(phase, islands) {
-    const rows = islands ? [...overviewContent.querySelectorAll('.tl-island-row')] : [overviewContent];
-    const specs = rows.map((element, index) => ({
-      element, delay: islands ? (phase === 'out' ? rows.length - index - 1 : index) * (phase === 'out' ? 8 : 12) : 0,
-      duration: phase === 'out' ? (islands ? 140 : 90) : (islands ? 220 : 180), move: islands || phase === 'in'
-    }));
-    const header = islands && overviewContent.querySelector('.tl-island-header');
-    if (header) specs.push({ element: header, delay: 0, duration: phase === 'out' ? 140 : 180, move: false });
-    await Promise.all(specs.map(async ({ element, delay, duration, move }) => {
-      const visible = { opacity: 1, transform: 'translateY(0px)' };
-      const hidden = { opacity: 0, transform: `translateY(${move ? 8 : 0}px)` };
-      const animation = element.animate(phase === 'out' ? [visible, hidden] : [hidden, visible],
-        { duration, delay, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'both' });
-      timelineViewAnimations.add(animation);
-      try { await animation.finished; } catch {} finally { timelineViewAnimations.delete(animation); }
-      // Remove filled effects before the next phase; the shared parent survives rendering.
-      animation.cancel();
-    }));
+  function captureTimelineTransition(islands) {
+    const viewport = timelineScroller.getBoundingClientRect();
+    const stage = document.createElement('div');stage.className = 'tl-transition-stage';
+    stage.classList.toggle('is-reverse', islands);
+    stage.setAttribute('aria-hidden', 'true');stage.setAttribute('inert', '');
+    Object.assign(stage.style, { left: `${viewport.left}px`, top: `${viewport.top}px`, width: `${viewport.width}px`, height: `${viewport.height}px` });
+    const sources = islands
+      ? [...overviewContent.querySelectorAll('.tl-island-header, .tl-island-row')]
+      : [...overviewContent.children].filter(element => element.classList.contains('tl-group'));
+    const actors = sources.map(source => {
+      const rect = source.getBoundingClientRect();
+      const copy = source.cloneNode(true);
+      const sourceLabel = source.querySelector('.tl-island-label, .tl-island-corner');
+      const labelOffset = sourceLabel ? sourceLabel.getBoundingClientRect().left - rect.left : 0;
+      [copy, ...copy.querySelectorAll('*')].forEach(element => {
+        ['id', 'aria-labelledby', 'aria-describedby', 'data-w-id'].forEach(name => element.removeAttribute(name));
+        element.classList.remove('is-hovered', 'is-peer-hovered', 'is-search-match', 'is-column-selected', 'is-decade-active');
+        if (element.matches('button, a, input, [tabindex]')) element.setAttribute('tabindex', '-1');
+      });
+      Object.assign(copy.style, { position: 'absolute', left: `${rect.left - viewport.left}px`, top: `${rect.top - viewport.top}px`,
+        width: `${rect.width}px`, height: `${rect.height}px`, margin: '0', boxSizing: 'border-box', overflow: 'hidden' });
+      let label = null;
+      if (islands) {
+        const grid = getComputedStyle(source).gridTemplateColumns;
+        copy.style.gridTemplateColumns = !grid || grid.includes('var(')
+          ? source.closest('.tl-island-matrix')?.style.getPropertyValue('--island-grid-columns') || grid : grid;
+        const localCounts = copy.querySelectorAll('.tl-column-count');localCounts.forEach(count => { count.style.display = 'none'; });
+        label = copy.querySelector('.tl-island-label, .tl-island-corner');
+        if (label) Object.assign(label.style, { position: 'relative', left: `${labelOffset}px`, minWidth: '0', overflow: 'hidden' });
+      }
+      stage.appendChild(copy);
+      return { copy, rect, key: source.dataset.century, label, labelOffset };
+    });
+    overview.appendChild(stage);timelineTransitionStage = stage;
+    return { stage, viewport, actors, islands };
+  }
+
+  function timelineOverlayGeometry(snapshot, targets) {
+    const viewport = snapshot.viewport;
+    if (!snapshot.islands) return snapshot.actors.map(actor => {
+      const target = targets.find(candidate => candidate.key === actor.key);
+      return { actor, left: (target?.rect.left ?? actor.rect.left) - viewport.left,
+        width: target?.rect.width ?? actor.rect.width };
+    });
+    const first = targets[0];
+    const widths = targets.map(target => target.rect.width);
+    const grid = `0px ${widths.map(width => `${width}px`).join(' ')}`;
+    const width = widths.reduce((sum, value) => sum + value, 0) + targets.length * 8;
+    return snapshot.actors.map(actor => ({ actor, left: (first?.rect.left ?? actor.rect.left) - viewport.left - (first ? 8 : 0),
+      width: first ? width : actor.rect.width, grid: first ? grid : undefined }));
+  }
+
+  async function animateTimelineOverlay(snapshot, next) {
+    const targetNodes = islandTimelineActive()
+      ? overviewContent.querySelectorAll('.tl-island-header > .tl-group')
+      : [...overviewContent.children].filter(element => element.classList.contains('tl-group'));
+    const targets = [...targetNodes].map(element => ({ key: element.dataset.century, rect: element.getBoundingClientRect() }));
+    const geometry = timelineOverlayGeometry(snapshot, targets);
+    const rise = Math.max(80, Math.min(260, snapshot.viewport.height * .45));
+    const effects = [], finished = [];
+    const play = (element, frames, duration = 500, delay = 0) => {
+      const animation = element.animate(frames, { duration, delay, easing: 'cubic-bezier(.22,.61,.36,1)', fill: 'both' });
+      effects.push(animation);timelineViewAnimations.add(animation);
+      finished.push(animation.finished.catch(() => {}));
+    };
+    // Both diagrams exist during this one shared motion interval. Group widths
+    // change directly, so circles and typography are never scaled or stretched.
+    play(snapshot.stage, [{ opacity: 1 }, { opacity: 0 }]);
+    for (const { actor, left, width, grid } of geometry) {
+      const from = { left: actor.copy.style.left, width: actor.copy.style.width };
+      const to = { left: `${left}px`, width: `${width}px` };
+      if (grid) { from.gridTemplateColumns = actor.copy.style.gridTemplateColumns;to.gridTemplateColumns = grid; }
+      play(actor.copy, [from, to]);
+      if (snapshot.islands) {
+        const index = snapshot.actors.indexOf(actor);
+        const delay = actor.copy.classList.contains('tl-island-row') ? Math.max(0, 7 - index) * 18 : 0;
+        play(actor.copy, [{ top: actor.copy.style.top }, { top: `${actor.rect.top - snapshot.viewport.top + rise}px` }], 392, delay);
+        if (actor.label) play(actor.label, [{ left: `${actor.labelOffset}px`, opacity: 1 }, { left: '0px', opacity: 0 }]);
+      }
+    }
+    play(overviewContent, [
+      { opacity: 0, transform: `translateY(${next ? rise : 0}px)` },
+      { opacity: 1, transform: 'translateY(0px)' }
+    ]);
+    if (next) overviewContent.querySelectorAll('.tl-island-row').forEach((row, index) => {
+      play(row, [{ opacity: 0, transform: 'translateY(24px)' }, { opacity: 1, transform: 'translateY(0px)' }], 392, index * 18);
+    });
+    await Promise.all(finished);
+    // Keep all filled effects until every row has finished; early cleanup would
+    // make a fading snapshot jump back to its original position.
+    effects.forEach(animation => { animation.cancel();timelineViewAnimations.delete(animation); });
+    snapshot.stage.remove();
+    if (timelineTransitionStage === snapshot.stage) timelineTransitionStage = null;
   }
 
   async function transitionIslandView(next) {
@@ -3706,20 +3785,19 @@ function renderFamilyCards(speciesList = []) {
     const token = timelineViewTransitionId;
     overviewIslandRequested = next;
     overviewIslandSwitch.setAttribute('aria-checked', String(next));
-    timelineTappedColumnKey = null;
-    timelineIslandHoverKey = null;
+    timelineTappedColumnKey = null;timelineIslandHoverKey = null;
     setOverviewMenu(false);hideTimelineTooltip();refreshTimelineSearchHighlights();
-    if (next === overviewIslands || overviewReducedMotion() || typeof overviewContent.animate !== 'function') {
+    const viewport = timelineScroller.getBoundingClientRect();
+    if (next === overviewIslands || overviewReducedMotion() || typeof overviewContent.animate !== 'function' || !viewport.width || !viewport.height) {
       overviewIslands = next;overviewIslandRequested = null;
       renderOverview(false, true, token);
       return;
     }
-    timelineScroller.classList.add('is-switching');
-    await animateTimelinePhase('out', islandTimelineActive());
-    if (token !== timelineViewTransitionId) return;
+    const snapshot = captureTimelineTransition(islandTimelineActive());
     overviewIslands = next;
+    timelineScroller.classList.add('is-switching');
     renderOverview(false, true, token);
-    await animateTimelinePhase('in', islandTimelineActive());
+    await animateTimelineOverlay(snapshot, next);
     if (token !== timelineViewTransitionId) return;
     overviewIslandRequested = null;
     timelineScroller.classList.remove('is-switching');
@@ -3915,7 +3993,7 @@ function renderFamilyCards(speciesList = []) {
     overview.style.setProperty('--tl-marker-gap', `${layout.gap}px`);
     const fragment = document.createDocumentFragment();
     for (const group of groups) {
-      const section = document.createElement('section'); section.className = 'tl-group';
+      const section = document.createElement('section'); section.className = 'tl-group';section.dataset.century = String(group.key);
       section.classList.toggle('is-before-1800', group.key === 0);
       const heading = document.createElement('h2'); heading.className = 'tl-heading';
       const title = document.createElement('span');
