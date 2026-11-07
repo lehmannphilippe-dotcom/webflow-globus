@@ -1655,7 +1655,8 @@ body.panel-open #species-browser { pointer-events: none; }
 #species-browser .tl-decades { display: flex; gap: 3px; flex: 1 1 auto; min-height: 0; }
 #species-browser .tl-decade { display: flex; flex-direction: column; flex: 0 0 auto; }
 #species-browser .tl-decade-label { color: #fff; font: 500 14px/18px "Rubik Variablefont Wght", sans-serif; margin: 0; flex: 0 0 18px; }
-#species-browser .tl-columns { display: flex; height: 100%; flex: 1 1 auto; min-height: 0; }
+#species-browser .tl-group.is-before-1800 .tl-decade { flex: 1 0 auto; }
+#species-browser .tl-columns { display: flex; height: 100%; flex: 1 1 auto; min-height: 0; background-color: #1d214a; }
 #species-browser .tl-column { position: relative; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--tl-marker-gap); width: 46px; flex: 0 0 auto; height: 100%; padding: 28px 8px 8px; box-sizing: border-box; background: #1d214a; transition: background-color 160ms ease-out; }
 #species-browser .tl-column-count { position: absolute; top: 4px; left: 4px; right: 4px; text-align: left; color: #fff; font: 400 14px/14px "Rubik Variablefont Wght", sans-serif; opacity: 0; pointer-events: none; }
 #species-browser .tl-column.is-hoverable:focus-within:not(.is-focus-restored) { background-color: #3f4c80; }
