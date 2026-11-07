@@ -840,36 +840,66 @@
     return preloadImage(url).catch(() => "");
   }
 
+  function ensurePanelImagePlaceholder() {
+    const wrapper = DOM.panelImg?.closest('.panel-image-wrap');
+    if (!wrapper) return null;
+    if (!wrapper.querySelector('.panel-loading-placeholder')) {
+      const placeholder = document.createElement('img');
+      placeholder.className = 'panel-loading-placeholder';
+      placeholder.alt = '';
+      placeholder.setAttribute('aria-hidden', 'true');
+      placeholder.decoding = 'async';
+      placeholder.src = CONFIG.DEFAULT_PANEL_IMG;
+      wrapper.appendChild(placeholder);
+    }
+    return wrapper;
+  }
+
   function setPanelImageForItem(item) {
     if (!DOM.panelImg || !item) return;
 
+    const image = DOM.panelImg;
+    const wrapper = ensurePanelImagePlaceholder();
     const panelUrl = item?.images?.panel || CONFIG.DEFAULT_PANEL_IMG;
-
     const requestId = ++panelImageRequestId;
+    const isCurrent = () => requestId === panelImageRequestId && activeSpeciesItem === item;
 
     if (isImageLoaded(panelUrl)) {
-      DOM.panelImg.classList.remove("is-loading");
-      U.setWFImage(DOM.panelImg, panelUrl);
+      // A ready final image needs neither the default preview nor a blur animation.
+      U.setWFImage(image, panelUrl);
+      image.classList.remove('is-loading', 'is-pending');
+      wrapper?.classList.remove('is-panel-image-pending');
       return;
     }
 
-    DOM.panelImg.classList.add("is-loading");
-    U.setWFImage(DOM.panelImg, panelUrl);
+    // A separate, preloaded default layer cannot retain the previous species bitmap.
+    image.classList.add('is-loading', 'is-pending');
+    wrapper?.classList.add('is-panel-image-pending');
+    U.setWFImage(image, panelUrl);
 
-    preloadImage(panelUrl)
-      .then(() => {
-        if (requestId !== panelImageRequestId) return;
-        if (activeSpeciesItem !== item) return;
+    const reveal = async url => {
+      if (!isCurrent()) return;
+      if (url !== panelUrl) U.setWFImage(image, url);
+      if (typeof image.decode === 'function') await image.decode();
+      if (!isCurrent()) return;
+      image.classList.remove('is-pending');
+      wrapper?.classList.remove('is-panel-image-pending');
+      // Paint only the newly decoded image blurred, then transition it to sharp.
+      doubleRAF(() => { if (isCurrent()) image.classList.remove('is-loading'); });
+    };
 
-        U.setWFImage(DOM.panelImg, panelUrl);
-        DOM.panelImg.classList.remove("is-loading");
-      })
-      .catch(() => {
-        if (requestId !== panelImageRequestId) return;
-        if (activeSpeciesItem !== item) return;
-
-        DOM.panelImg.classList.remove("is-loading");
-      });
+    preloadImage(panelUrl).then(() => reveal(panelUrl)).catch(async () => {
+      if (!isCurrent()) return;
+      if (panelUrl !== CONFIG.DEFAULT_PANEL_IMG) {
+        try {
+          await preloadImage(CONFIG.DEFAULT_PANEL_IMG);
+          await reveal(CONFIG.DEFAULT_PANEL_IMG);
+          return;
+        } catch {}
+      }
+      if (isCurrent()) image.classList.remove('is-loading');
+      // If both files are unavailable, keep the old/broken main bitmap hidden.
+    });
   }
 
   function compareText(a, b) {
@@ -1609,6 +1639,9 @@
 
   ensureAIImageInfoUI();
   bindAIImageInfoEvents();
+  ensurePanelImagePlaceholder();
+  // Load the default while the intro is visible, before the first species selection.
+  preloadImage(CONFIG.DEFAULT_PANEL_IMG).catch(() => {});
 
   // =========================================================
   // CESIUM VIEWER
