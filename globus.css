@@ -1841,3 +1841,10 @@ body.panel-open #species-browser { pointer-events: none; }
 }
 #species-browser .tl-island-decade-heading.is-decade-active .tl-island-shared-count { opacity: 1; }
 #species-browser .gbv-timeline.is-switching { pointer-events: none; }
+
+/* The outgoing diagram is a clipped, inert visual layer behind the incoming view. */
+#species-browser .tl-transition-stage {
+  position: fixed; z-index: 1; overflow: hidden; pointer-events: none; user-select: none;
+}
+#species-browser .tl-transition-stage.is-reverse { z-index: 3; }
+#species-browser .gbv-timeline.is-switching { z-index: 2; }
