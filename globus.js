@@ -844,10 +844,6 @@
     if (!DOM.panelImg || !item) return;
 
     const panelUrl = item?.images?.panel || CONFIG.DEFAULT_PANEL_IMG;
-    const blurUrl =
-      item?.images?.tooltip ||
-      item?.images?.panel ||
-      CONFIG.DEFAULT_PANEL_IMG;
 
     const requestId = ++panelImageRequestId;
 
@@ -858,7 +854,7 @@
     }
 
     DOM.panelImg.classList.add("is-loading");
-    U.setWFImage(DOM.panelImg, blurUrl);
+    U.setWFImage(DOM.panelImg, panelUrl);
 
     preloadImage(panelUrl)
       .then(() => {
@@ -1758,6 +1754,11 @@
   let rangeHoverTargets = new WeakMap();
   let hoveredRange = null;
   let rangeHoverHideTimer = 0;
+  let rangeTapActive = false;
+  let rangePointerType = '';
+  const rangeMouseMedia = matchMedia('(hover: hover) and (pointer: fine)');
+  const rangeUsesTouch = () => rangePointerType ? rangePointerType !== 'mouse' : !rangeMouseMedia.matches;
+  viewer.scene.canvas.addEventListener('pointerdown', event => { rangePointerType = event.pointerType || 'mouse'; }, { passive: true });
   const rangeSpotAnimations = new Map();
   const rangePopup = document.createElement('aside');
   rangePopup.id = 'range-hover-popup';
@@ -1824,6 +1825,7 @@
     rangeHoverHideTimer = 0;
     animateRangeSpot(hoveredRange, false, immediate);
     hoveredRange = null;
+    rangeTapActive = false;
     rangePopup.hidden = true;
     if (immediate) {
       // A shrinking point can belong to a collection about to be cleared.
@@ -1837,7 +1839,7 @@
   }
 
   function scheduleRangeHoverHide() {
-    if (rangeHoverHideTimer) return;
+    if (rangeTapActive || rangeHoverHideTimer) return;
     rangeHoverHideTimer = setTimeout(() => hideRangeHover(), 120);
   }
 
@@ -1868,19 +1870,24 @@
     rangePopup.style.top = `${Math.max(top, Math.min(preferredY, bottom - box.height))}px`;
   }
 
-  function updateRangeHover(position) {
-    if (!canHoverRanges()) { hideRangeHover(true); return; }
+  function updateRangeHover(position, tap = false) {
+    if (!canHoverRanges()) { hideRangeHover(true); return false; }
     // Spots take priority when they overlap a polygon.
     const targets = viewer.scene.drillPick(position, 12).map(resolveRangeHover).filter(Boolean);
     const target = targets.find(t => t.kind === 'spot') || targets[0];
-    if (!target) { scheduleRangeHoverHide(); return; }
+    if (!target) {
+      if (tap) hideRangeHover();
+      else scheduleRangeHoverHide();
+      return false;
+    }
+    rangeTapActive = tap;
     clearTimeout(rangeHoverHideTimer); rangeHoverHideTimer = 0;
     if (hoveredRange !== target) {
       animateRangeSpot(hoveredRange, false);
       hoveredRange = target;
       animateRangeSpot(target, true);
     }
-    if (!target.content) { rangePopup.hidden = true; return; }
+    if (!target.content) { rangePopup.hidden = true; return true; }
     rangePopupTitle.textContent = target.content.title ?? '';
     rangePopupTitle.hidden = target.content.title === null;
     rangePopupText.textContent = target.content.text ?? '';
@@ -1888,17 +1895,22 @@
     rangePopup.style.setProperty('--rh-color', target.color);
     rangePopup.hidden = false;
     positionRangePopup(position);
+    return true;
   }
 
   rangePopup.addEventListener('pointerenter', () => {
     clearTimeout(rangeHoverHideTimer); rangeHoverHideTimer = 0;
     if (!canHoverRanges()) hideRangeHover(true);
   });
-  rangePopup.addEventListener('pointerleave', () => hideRangeHover());
+  rangePopup.addEventListener('pointerleave', () => { if (!rangeTapActive) hideRangeHover(); });
   rangePopup.addEventListener('click', event => event.stopPropagation());
   DOM.globeHost.addEventListener('pointerleave', event => {
     if (!rangePopup.contains(event.relatedTarget)) scheduleRangeHoverHide();
   });
+  document.addEventListener('pointerdown', event => {
+    if (rangeTapActive && !rangePopup.contains(event.target) && !DOM.globeHost.contains(event.target)) hideRangeHover();
+  }, { passive: true });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') hideRangeHover(true); });
   addEventListener('blur', () => hideRangeHover(true));
   addEventListener('resize', () => hideRangeHover(true), { passive: true });
 
@@ -3250,7 +3262,8 @@ function renderFamilyCards(speciesList = []) {
         }
         resetGenusMarkerHover(true);
         hideTooltip();
-        updateRangeHover(m.endPosition);
+        // Cesium also emits mouse movement for touch drags; taps own their popup.
+        if (!rangeUsesTouch() && !rangeTapActive) updateRangeHover(m.endPosition);
         return;
       }
       hideRangeHover(true);
@@ -3269,6 +3282,10 @@ function renderFamilyCards(speciesList = []) {
   handler.setInputAction(
     async (c) => {
       if (introActive || hawaiiFlightActive || hawaiiFlightPending) return;
+      if (rangeUsesTouch() && canHoverRanges()) {
+        const hadPopup = rangeTapActive;
+        if (updateRangeHover(c.position, true) || hadPopup) return;
+      }
       if (activeGenusItems !== null) {
         const point = pickGenusMarker(c.position);
         if (point) { await openSpeciesFromCard(point.id); return; }
@@ -3581,14 +3598,14 @@ function renderFamilyCards(speciesList = []) {
     hideTimelineTooltip();
     overviewContent.setAttribute('aria-busy', 'true');
     const groups = timelineGroups(ALL, overviewRegion);
-    // Use the full dataset for sizing so both region views have identical dots.
-    const sizingGroups = overviewRegion === 'all' ? groups : timelineGroups(ALL, 'all');
-    const layout = timelinePointLayout(timelineScroller.clientHeight, sizingGroups);
+    // Fit the currently visible region, retaining the same 30px maximum.
+    const layout = timelinePointLayout(timelineScroller.clientHeight, groups);
     overview.style.setProperty('--tl-marker-size', `${layout.markerSize}px`);
     overview.style.setProperty('--tl-marker-gap', `${layout.gap}px`);
     const fragment = document.createDocumentFragment();
     for (const group of groups) {
       const section = document.createElement('section'); section.className = 'tl-group';
+      section.classList.toggle('is-before-1800', group.key === 0);
       const heading = document.createElement('h2'); heading.className = 'tl-heading';
       const title = document.createElement('span');
       if (group.key === 0) {
